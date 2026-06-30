@@ -4,8 +4,8 @@ insert into service_catalog_items (id, name, description, base_price, estimated_
 ('33333333-3333-3333-3333-333333333333', 'Balanceamento', 'Balanceamento das rodas.', 100.00, 50, true, now(), now()),
 ('44444444-4444-4444-4444-444444444444', 'Diagnóstico eletrônico', 'Leitura de scanner e análise de falhas.', 180.00, 45, true, now(), now());
 
-insert into parts (id, name, sku, unit_price, quantity_in_stock, minimum_stock, active, version, created_at, updated_at) values
-('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Óleo sintético 5W30 1L', 'OIL-5W30-1L', 48.90, 80, 10, true, 0, now(), now()),
-('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Filtro de óleo', 'FILTER-OIL-001', 35.00, 40, 8, true, 0, now(), now()),
-('cccccccc-cccc-cccc-cccc-cccccccccccc', 'Filtro de ar', 'FILTER-AIR-001', 55.00, 25, 5, true, 0, now(), now()),
-('dddddddd-dddd-dddd-dddd-dddddddddddd', 'Pastilha de freio dianteira', 'BRAKE-PAD-FRONT', 220.00, 16, 4, true, 0, now(), now());
+insert into parts (id, name, sku, unit_price, quantity_in_stock, minimum_stock, active, created_at, updated_at) values
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Óleo sintético 5W30 1L', 'OIL-5W30-1L', 48.90, 80, 10, true, now(), now()),
+('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Filtro de óleo', 'FILTER-OIL-001', 35.00, 40, 8, true, now(), now()),
+('cccccccc-cccc-cccc-cccc-cccccccccccc', 'Filtro de ar', 'FILTER-AIR-001', 55.00, 25, 5, true, now(), now()),
+('dddddddd-dddd-dddd-dddd-dddddddddddd', 'Pastilha de freio dianteira', 'BRAKE-PAD-FRONT', 220.00, 16, 4, true, now(), now());
