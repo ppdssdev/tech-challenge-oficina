@@ -26,9 +26,13 @@
 | Swagger | `springdoc-openapi` em `/swagger-ui.html` |
 | Dockerfile | `Dockerfile` |
 | docker-compose | `docker-compose.yml` com API + PostgreSQL |
+| Imagem Docker segura | Imagem final Alpine, pacotes atualizados e usuário não-root |
 | Testes unitários | `src/test/java/.../domain` |
 | Testes de aplicação com mocks | `WorkOrderApplicationServiceTest` |
 | Testes de status de erro | `ApiExceptionHandlerTest` |
 | Teste de integração | `WorkOrderFlowIntegrationTest` |
 | Cobertura 80% domínio crítico | `jacoco-maven-plugin` no `pom.xml` |
 | README local | `README.md` |
+| Documentação técnica | `docs/architecture.md`, `docs/requirements-checklist.md`, `docs/api-examples.http` |
+| Relatório de vulnerabilidades | Preparado como artefato externo da entrega a partir do scan Trivy |
+| Documentação DDD visual | Preparada como artefato externo da entrega em Miro ou equivalente |

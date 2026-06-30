@@ -62,3 +62,11 @@ Essa abordagem mantém o modelo simples para o MVP, mas já demonstra uma preocu
 - A aprovação adicional de reparos é feita pelo endpoint administrativo `POST /api/v1/admin/work-orders/{id}/approve`.
 - A consulta do cliente é pública, mas exige código da OS e CPF/CNPJ para reduzir exposição de dados.
 - O banco escolhido foi PostgreSQL por robustez transacional, integridade referencial, bom suporte a UUID, tipos numéricos precisos e uso comum em sistemas administrativos.
+
+## Segurança e operacao
+
+- APIs administrativas exigem JWT.
+- A API publica de acompanhamento exige codigo da OS e documento do cliente.
+- Excecoes sao convertidas para respostas HTTP padronizadas.
+- A imagem Docker final usa Alpine, atualiza pacotes com `apk upgrade --no-cache` e executa a aplicacao com usuario nao-root.
+- O projeto pode ser escaneado com Trivy usando os comandos descritos no `README.md`.

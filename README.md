@@ -9,7 +9,7 @@ O projeto foi construído como **monólito Spring Boot em camadas**, usando **DD
 ## Stack
 
 - Java 21
-- Spring Boot 3.5.0
+- Spring Boot 3.5.14
 - Spring Web
 - Spring Data JPA
 - Spring Security
@@ -83,6 +83,8 @@ A escolha é coerente com o domínio porque o sistema precisa de:
 - Validação de CPF/CNPJ com Value Object `DocumentNumber`.
 - Validação de placa nos formatos brasileiro antigo e Mercosul com Value Object `VehiclePlate`.
 - Controle de concorrência no estoque com `@Version` em `Part` e locks pessimistas nos fluxos de baixa/incremento.
+- Imagem Docker final baseada em Alpine, com pacotes atualizados e execução por usuário não-root.
+- Dependências revisadas após scan de vulnerabilidades com Trivy.
 - Testes unitários de domínio.
 - Testes de serviços de aplicação com mocks.
 - Testes de tratamento de exceções e status HTTP.
@@ -128,6 +130,14 @@ O projeto usa DDD de forma pragmática dentro de um monólito em camadas:
 - `VehiclePlate` é um Value Object para placa, mantendo normalização e validação no domínio.
 - `Part` controla regras de estoque, como baixa, incremento, estoque mínimo e concorrência.
 - Serviços de aplicação coordenam casos de uso e transações, mas regras críticas ficam no domínio.
+
+### Documentação técnica
+
+- [Arquitetura e DDD](docs/architecture.md)
+- [Checklist de requisitos](docs/requirements-checklist.md)
+- [Exemplos de chamadas HTTP](docs/api-examples.http)
+
+Os artefatos finais da fase, como PDF de entrega, board de Event Storming/Miro, roteiro do vídeo e relatório formal de vulnerabilidades, são preparados fora do repositório a partir destes documentos técnicos e dos resultados dos scans.
 
 ---
 
@@ -241,6 +251,24 @@ Relatório JaCoCo:
 
 ```text
 target/site/jacoco/index.html
+```
+
+Executar scan de vulnerabilidades com Trivy via Docker:
+
+```bash
+mkdir -p target/security
+
+docker run --rm -v "$PWD:/workspace" -v "$HOME/.cache/trivy:/root/.cache" \
+  aquasec/trivy:latest fs --offline-scan --format table \
+  --output /workspace/target/security/trivy-fs.txt /workspace
+
+docker build --progress=plain -t oficina-api:local .
+
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$HOME/.cache/trivy:/root/.cache" \
+  -v "$PWD/target/security:/reports" \
+  aquasec/trivy:latest image --offline-scan --format table \
+  --output /reports/trivy-image.txt oficina-api:local
 ```
 
 Tipos de teste existentes:
