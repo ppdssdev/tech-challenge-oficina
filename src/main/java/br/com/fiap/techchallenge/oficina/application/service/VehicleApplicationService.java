@@ -26,7 +26,7 @@ public class VehicleApplicationService {
     @Transactional
     public VehicleResponse create(VehicleRequest request) {
         String plate = VehiclePlateValidator.normalize(request.plate());
-        if (vehicleRepository.existsByPlate(plate)) {
+        if (vehicleRepository.existsByPlateValue(plate)) {
             throw new ConflictException("Já existe veículo cadastrado com essa placa.");
         }
         var customer = customerService.findById(request.customerId());
@@ -48,7 +48,7 @@ public class VehicleApplicationService {
     public VehicleResponse update(UUID id, VehicleRequest request) {
         var vehicle = findById(id);
         String plate = VehiclePlateValidator.normalize(request.plate());
-        vehicleRepository.findByPlate(plate)
+        vehicleRepository.findByPlateValue(plate)
             .filter(existing -> !existing.getId().equals(id))
             .ifPresent(existing -> {
                 throw new ConflictException("Já existe outro veículo cadastrado com essa placa.");

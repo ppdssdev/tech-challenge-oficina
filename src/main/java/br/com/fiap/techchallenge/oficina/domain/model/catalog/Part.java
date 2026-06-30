@@ -5,6 +5,7 @@ import br.com.fiap.techchallenge.oficina.domain.model.base.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -29,6 +30,11 @@ public class Part extends BaseEntity {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    @SuppressWarnings("unused")
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     protected Part() {
     }
@@ -106,5 +112,9 @@ public class Part extends BaseEntity {
 
     public boolean isActive() {
         return active;
+    }
+
+    public long getVersion() {
+        return version;
     }
 }

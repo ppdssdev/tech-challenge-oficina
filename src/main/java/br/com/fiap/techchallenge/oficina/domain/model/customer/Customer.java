@@ -3,10 +3,11 @@ package br.com.fiap.techchallenge.oficina.domain.model.customer;
 import br.com.fiap.techchallenge.oficina.domain.exception.BusinessException;
 import br.com.fiap.techchallenge.oficina.domain.model.base.BaseEntity;
 import br.com.fiap.techchallenge.oficina.domain.service.DocumentValidator;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.AttributeOverrides;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 
 @Entity
@@ -16,12 +17,18 @@ public class Customer extends BaseEntity {
     @Column(name = "full_name", nullable = false, length = 120)
     private String fullName;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "document_type", nullable = false, length = 4)
-    private DocumentType documentType;
-
-    @Column(name = "document_number", nullable = false, unique = true, length = 14)
-    private String documentNumber;
+    @Embedded
+    @AttributeOverrides({
+        @AttributeOverride(
+            name = "type",
+            column = @Column(name = "document_type", nullable = false, length = 4)
+        ),
+        @AttributeOverride(
+            name = "value",
+            column = @Column(name = "document_number", nullable = false, unique = true, length = 14)
+        )
+    })
+    private DocumentNumber documentNumber;
 
     @Column(length = 160)
     private String email;
@@ -40,18 +47,8 @@ public class Customer extends BaseEntity {
         if (isBlank(fullName)) {
             throw new BusinessException("Nome do cliente é obrigatório.");
         }
-        if (documentType == null) {
-            throw new BusinessException("Tipo do documento é obrigatório.");
-        }
-
-        var normalizedDocument = DocumentValidator.onlyDigits(documentNumber);
-        if (!DocumentValidator.isValid(documentType, normalizedDocument)) {
-            throw new BusinessException("Documento inválido para o tipo informado.");
-        }
-
         this.fullName = fullName.trim();
-        this.documentType = documentType;
-        this.documentNumber = normalizedDocument;
+        this.documentNumber = new DocumentNumber(documentType, documentNumber);
         this.email = normalize(email);
         this.phone = DocumentValidator.onlyDigits(phone);
     }
@@ -69,11 +66,11 @@ public class Customer extends BaseEntity {
     }
 
     public DocumentType getDocumentType() {
-        return documentType;
+        return documentNumber.getType();
     }
 
     public String getDocumentNumber() {
-        return documentNumber;
+        return documentNumber.getValue();
     }
 
     public String getEmail() {

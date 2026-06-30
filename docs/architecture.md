@@ -17,6 +17,8 @@ O DDD foi usado de forma pragmática. O domínio da oficina aparece diretamente 
 
 - `Customer`: cliente identificado por CPF/CNPJ.
 - `Vehicle`: veículo do cliente, identificado por placa.
+- `DocumentNumber`: Value Object que normaliza e valida CPF/CNPJ.
+- `VehiclePlate`: Value Object que normaliza e valida placas brasileiras antigas e Mercosul.
 - `ServiceCatalogItem`: serviço oferecido pela oficina.
 - `Part`: peça ou insumo com controle de estoque.
 - `WorkOrder`: agregado central da ordem de serviço.
@@ -32,7 +34,18 @@ A `WorkOrder` concentra as principais regras:
 - mudança automática para `WAITING_APPROVAL` quando existe orçamento;
 - aprovação do orçamento;
 - baixa de estoque das peças apenas na aprovação;
+- validação prévia do estoque total pendente antes de qualquer baixa;
 - mudança para `IN_EXECUTION`, `FINALIZED` e `DELIVERED` conforme ações administrativas.
+
+## Concorrência no estoque
+
+O estoque é uma área crítica do domínio. Para reduzir risco de atualização concorrente:
+
+- `Part` possui `@Version`, permitindo locking otimista e detecção de conflito de versão.
+- Os endpoints de baixa/incremento de estoque carregam a peça com `PESSIMISTIC_WRITE`.
+- A aprovação de orçamento carrega os itens de peças com lock pessimista antes de validar e reservar estoque.
+
+Essa abordagem mantém o modelo simples para o MVP, mas já demonstra uma preocupação arquitetural real com consistência transacional.
 
 ## Ciclo de status
 

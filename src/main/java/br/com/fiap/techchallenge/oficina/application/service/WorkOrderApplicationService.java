@@ -129,7 +129,7 @@ public class WorkOrderApplicationService {
 
     @Transactional
     public WorkOrderResponse approveBudget(UUID id) {
-        var order = findDetailedById(id);
+        var order = findDetailedByIdForStockUpdate(id);
         order.approveBudget();
         return WorkOrderResponse.from(order);
     }
@@ -178,7 +178,7 @@ public class WorkOrderApplicationService {
     private Customer resolveCustomer(CreateWorkOrderRequest request) {
         var input = request.customer();
         String document = DocumentValidator.onlyDigits(input.documentNumber());
-        return customerRepository.findByDocumentNumber(document)
+        return customerRepository.findByDocumentNumberValue(document)
             .orElseGet(() -> customerRepository.save(new Customer(
                 input.fullName(), input.documentType(), document, input.email(), input.phone()
             )));
@@ -187,7 +187,7 @@ public class WorkOrderApplicationService {
     private Vehicle resolveVehicle(Customer customer, CreateWorkOrderRequest request) {
         var input = request.vehicle();
         String plate = VehiclePlateValidator.normalize(input.plate());
-        return vehicleRepository.findByPlate(plate)
+        return vehicleRepository.findByPlateValue(plate)
             .map(existing -> {
                 if (!existing.getCustomer().getId().equals(customer.getId())) {
                     throw new ConflictException("Veículo já cadastrado para outro cliente.");
@@ -203,6 +203,16 @@ public class WorkOrderApplicationService {
         var order = workOrderRepository.findDetailedById(id)
             .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
         initializeDetailedCollections(id);
+        return order;
+    }
+
+    private WorkOrder findDetailedByIdForStockUpdate(UUID id) {
+        var order = workOrderRepository.findDetailedById(id)
+            .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
+        workOrderRepository.findDetailedServiceItemsById(id)
+            .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
+        workOrderRepository.findDetailedPartItemsByIdForStockUpdate(id)
+            .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
         return order;
     }
 

@@ -24,7 +24,7 @@ public class CustomerApplicationService {
     @Transactional
     public CustomerResponse create(CustomerRequest request) {
         String document = DocumentValidator.onlyDigits(request.documentNumber());
-        if (repository.existsByDocumentNumber(document)) {
+        if (repository.existsByDocumentNumberValue(document)) {
             throw new ConflictException("Já existe cliente cadastrado com esse CPF/CNPJ.");
         }
         var customer = new Customer(request.fullName(), request.documentType(), document, request.email(), request.phone());
@@ -45,7 +45,7 @@ public class CustomerApplicationService {
     public CustomerResponse update(UUID id, CustomerRequest request) {
         var customer = findById(id);
         String document = DocumentValidator.onlyDigits(request.documentNumber());
-        repository.findByDocumentNumber(document)
+        repository.findByDocumentNumberValue(document)
             .filter(existing -> !existing.getId().equals(id))
             .ifPresent(existing -> {
                 throw new ConflictException("Já existe outro cliente cadastrado com esse CPF/CNPJ.");

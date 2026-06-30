@@ -2,12 +2,14 @@ package br.com.fiap.techchallenge.oficina.infrastructure.repository;
 
 import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
 import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrderStatus;
+import jakarta.persistence.LockModeType;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -38,6 +40,16 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, UUID> {
         where w.id = :id
         """)
     Optional<WorkOrder> findDetailedPartItemsById(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select distinct w
+        from WorkOrder w
+        left join fetch w.partItems partItem
+        left join fetch partItem.part
+        where w.id = :id
+        """)
+    Optional<WorkOrder> findDetailedPartItemsByIdForStockUpdate(@Param("id") UUID id);
 
     @EntityGraph(attributePaths = {"customer", "vehicle"})
     List<WorkOrder> findByStatus(WorkOrderStatus status);

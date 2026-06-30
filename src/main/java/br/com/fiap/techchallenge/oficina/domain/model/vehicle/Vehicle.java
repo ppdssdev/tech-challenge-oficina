@@ -3,8 +3,9 @@ package br.com.fiap.techchallenge.oficina.domain.model.vehicle;
 import br.com.fiap.techchallenge.oficina.domain.exception.BusinessException;
 import br.com.fiap.techchallenge.oficina.domain.model.base.BaseEntity;
 import br.com.fiap.techchallenge.oficina.domain.model.customer.Customer;
-import br.com.fiap.techchallenge.oficina.domain.service.VehiclePlateValidator;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -22,8 +23,12 @@ public class Vehicle extends BaseEntity {
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
 
-    @Column(nullable = false, unique = true, length = 7)
-    private String plate;
+    @Embedded
+    @AttributeOverride(
+        name = "value",
+        column = @Column(name = "plate", nullable = false, unique = true, length = 7)
+    )
+    private VehiclePlate plate;
 
     @Column(nullable = false, length = 60)
     private String brand;
@@ -45,10 +50,6 @@ public class Vehicle extends BaseEntity {
         if (customer == null) {
             throw new BusinessException("Cliente do veículo é obrigatório.");
         }
-        var normalizedPlate = VehiclePlateValidator.normalize(plate);
-        if (!VehiclePlateValidator.isValid(normalizedPlate)) {
-            throw new BusinessException("Placa do veículo inválida.");
-        }
         if (isBlank(brand) || isBlank(model)) {
             throw new BusinessException("Marca e modelo do veículo são obrigatórios.");
         }
@@ -58,7 +59,7 @@ public class Vehicle extends BaseEntity {
         }
 
         this.customer = customer;
-        this.plate = normalizedPlate;
+        this.plate = new VehiclePlate(plate);
         this.brand = brand.trim();
         this.model = model.trim();
         this.manufacturingYear = manufacturingYear;
@@ -70,7 +71,7 @@ public class Vehicle extends BaseEntity {
     }
 
     public String getPlate() {
-        return plate;
+        return plate.getValue();
     }
 
     public String getBrand() {

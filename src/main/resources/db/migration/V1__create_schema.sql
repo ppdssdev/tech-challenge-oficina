@@ -49,6 +49,7 @@ create table parts (
     quantity_in_stock integer not null,
     minimum_stock integer not null,
     active boolean not null,
+    version bigint not null default 0,
     created_at timestamp with time zone not null,
     updated_at timestamp with time zone not null
 );

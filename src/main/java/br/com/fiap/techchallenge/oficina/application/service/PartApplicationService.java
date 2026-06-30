@@ -65,14 +65,14 @@ public class PartApplicationService {
 
     @Transactional
     public PartResponse increaseStock(UUID id, int quantity) {
-        var part = findById(id);
+        var part = findByIdForStockUpdate(id);
         part.increaseStock(quantity);
         return PartResponse.from(part);
     }
 
     @Transactional
     public PartResponse decreaseStock(UUID id, int quantity) {
-        var part = findById(id);
+        var part = findByIdForStockUpdate(id);
         part.decreaseStock(quantity);
         return PartResponse.from(part);
     }
@@ -85,5 +85,10 @@ public class PartApplicationService {
 
     public Part findById(UUID id) {
         return repository.findById(id).orElseThrow(() -> new NotFoundException("Peça/insumo não encontrado."));
+    }
+
+    private Part findByIdForStockUpdate(UUID id) {
+        return repository.findByIdForStockUpdate(id)
+            .orElseThrow(() -> new NotFoundException("Peça/insumo não encontrado."));
     }
 }

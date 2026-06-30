@@ -80,9 +80,12 @@ A escolha é coerente com o domínio porque o sistema precisa de:
 - Login administrativo com JWT.
 - APIs administrativas protegidas.
 - Consulta pública da OS sem JWT, mas exigindo CPF/CNPJ do cliente.
-- Validação de CPF/CNPJ.
-- Validação de placa nos formatos brasileiro antigo e Mercosul.
+- Validação de CPF/CNPJ com Value Object `DocumentNumber`.
+- Validação de placa nos formatos brasileiro antigo e Mercosul com Value Object `VehiclePlate`.
+- Controle de concorrência no estoque com `@Version` em `Part` e locks pessimistas nos fluxos de baixa/incremento.
 - Testes unitários de domínio.
+- Testes de serviços de aplicação com mocks.
+- Testes de tratamento de exceções e status HTTP.
 - Teste de integração do fluxo principal da OS.
 - JaCoCo configurado para cobertura mínima de 80% nos pacotes críticos de domínio.
 
@@ -114,6 +117,17 @@ src/main/java/br/com/fiap/techchallenge/oficina
 - `domain`: entidades, estados, validações e regras de negócio.
 - `infrastructure`: persistência com Spring Data JPA.
 - `security`: JWT, autenticação e filtro de segurança.
+
+### DDD no projeto
+
+O projeto usa DDD de forma pragmática dentro de um monólito em camadas:
+
+- `WorkOrder` é o agregado central da ordem de serviço e protege o ciclo de vida da OS.
+- `WorkOrderServiceItem` e `WorkOrderPartItem` pertencem ao agregado `WorkOrder`.
+- `DocumentNumber` é um Value Object para CPF/CNPJ, mantendo normalização e validação no domínio.
+- `VehiclePlate` é um Value Object para placa, mantendo normalização e validação no domínio.
+- `Part` controla regras de estoque, como baixa, incremento, estoque mínimo e concorrência.
+- Serviços de aplicação coordenam casos de uso e transações, mas regras críticas ficam no domínio.
 
 ---
 
@@ -211,11 +225,13 @@ Bearer SEU_TOKEN_AQUI
 
 ## Executar testes
 
+Executar todos os testes automatizados:
+
 ```bash
 mvn test
 ```
 
-Executar testes com verificação de cobertura:
+Executar testes, empacotamento e verificação de cobertura JaCoCo:
 
 ```bash
 mvn clean verify
@@ -226,6 +242,22 @@ Relatório JaCoCo:
 ```text
 target/site/jacoco/index.html
 ```
+
+Tipos de teste existentes:
+
+- domínio: regras puras de `WorkOrder`, `Part`, `Customer`, Value Objects e validators;
+- aplicação: serviços de aplicação com mocks para cenários de erro;
+- API: fluxo REST com Spring Boot, autenticação JWT e consulta pública;
+- exceções: validação dos status HTTP esperados, como `401`, `403`, `404`, `409` e `422`.
+
+Status HTTP principais:
+
+- `400 Bad Request`: payload, parâmetros ou tipos inválidos;
+- `401 Unauthorized`: credenciais inválidas ou JWT ausente/inválido;
+- `403 Forbidden`: usuário autenticado sem permissão;
+- `404 Not Found`: recurso inexistente ou consulta pública com documento divergente;
+- `409 Conflict`: conflito de unicidade/integridade;
+- `422 Unprocessable Entity`: violação de regra de negócio.
 
 ---
 
@@ -419,3 +451,5 @@ Peças:
 - Não há módulo financeiro completo. O foco está em orçamento, autorização, execução e controle de estoque.
 - A baixa de estoque acontece na aprovação do orçamento, não na criação da OS.
 - O endpoint público exige documento do cliente para evitar consulta aberta apenas pelo código da OS.
+- A aprovação da OS trava pessimisticamente as peças envolvidas antes de baixar estoque, reduzindo risco de corrida em aprovações concorrentes.
+- A entidade `Part` usa `@Version` para detecção otimista de conflitos de atualização.

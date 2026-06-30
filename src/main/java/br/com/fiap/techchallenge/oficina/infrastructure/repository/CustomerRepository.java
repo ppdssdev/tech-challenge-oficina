@@ -6,6 +6,6 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CustomerRepository extends JpaRepository<Customer, UUID> {
-    Optional<Customer> findByDocumentNumber(String documentNumber);
-    boolean existsByDocumentNumber(String documentNumber);
+    Optional<Customer> findByDocumentNumberValue(String documentNumber);
+    boolean existsByDocumentNumberValue(String documentNumber);
 }
