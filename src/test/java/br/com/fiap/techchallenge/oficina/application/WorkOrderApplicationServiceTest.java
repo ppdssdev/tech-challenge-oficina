@@ -13,6 +13,7 @@ import br.com.fiap.techchallenge.oficina.infrastructure.repository.PartRepositor
 import br.com.fiap.techchallenge.oficina.infrastructure.repository.ServiceCatalogRepository;
 import br.com.fiap.techchallenge.oficina.infrastructure.repository.VehicleRepository;
 import br.com.fiap.techchallenge.oficina.infrastructure.repository.WorkOrderRepository;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,7 +23,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -87,6 +90,53 @@ class WorkOrderApplicationServiceTest {
         assertThatThrownBy(() -> service.publicStatus(order.getCode(), "00000000000"))
             .isInstanceOf(NotFoundException.class)
             .hasMessageContaining("Ordem de serviço não encontrada");
+    }
+
+    @Test
+    void shouldQueryAverageExecutionTimeWithoutDateFilters() {
+        when(workOrderRepository.findCompletedForMetrics()).thenReturn(List.of());
+
+        var response = service.averageExecutionTime(null, null);
+
+        assertThat(response.completedWorkOrders()).isZero();
+        verify(workOrderRepository).findCompletedForMetrics();
+    }
+
+    @Test
+    void shouldQueryAverageExecutionTimeWithFromFilterOnly() {
+        var from = OffsetDateTime.parse("2026-06-30T00:00:00-03:00");
+        when(workOrderRepository.findCompletedForMetricsFrom(from))
+            .thenReturn(List.of());
+
+        var response = service.averageExecutionTime(from, null);
+
+        assertThat(response.completedWorkOrders()).isZero();
+        verify(workOrderRepository).findCompletedForMetricsFrom(from);
+    }
+
+    @Test
+    void shouldQueryAverageExecutionTimeWithToFilterOnly() {
+        var to = OffsetDateTime.parse("2026-06-30T23:59:59-03:00");
+        when(workOrderRepository.findCompletedForMetricsTo(to))
+            .thenReturn(List.of());
+
+        var response = service.averageExecutionTime(null, to);
+
+        assertThat(response.completedWorkOrders()).isZero();
+        verify(workOrderRepository).findCompletedForMetricsTo(to);
+    }
+
+    @Test
+    void shouldQueryAverageExecutionTimeWithDateRange() {
+        var from = OffsetDateTime.parse("2026-06-30T00:00:00-03:00");
+        var to = OffsetDateTime.parse("2026-06-30T23:59:59-03:00");
+        when(workOrderRepository.findCompletedForMetricsBetween(from, to))
+            .thenReturn(List.of());
+
+        var response = service.averageExecutionTime(from, to);
+
+        assertThat(response.completedWorkOrders()).isZero();
+        verify(workOrderRepository).findCompletedForMetricsBetween(from, to);
     }
 
     private WorkOrder sampleOrder() {

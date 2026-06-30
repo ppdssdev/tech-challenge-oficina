@@ -141,16 +141,184 @@ Os artefatos finais da fase, como PDF de entrega, board de Event Storming/Miro, 
 
 ---
 
-## Como executar localmente com Docker
+## Guia rápido para avaliadores
+
+Este roteiro sobe o ambiente completo, autentica no Swagger e valida o fluxo principal da ordem de serviço.
+
+### 1. Subir a aplicação
+
+Na raiz do projeto:
+
+```bash
+docker compose up --build
+```
+
+Para rodar em segundo plano:
+
+```bash
+docker compose up --build -d
+docker compose logs -f api
+```
+
+Se já existir um banco local com migrations antigas e o Flyway acusar erro de checksum, zere o ambiente local de teste:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+Use `docker compose down -v` somente quando puder apagar os dados locais do PostgreSQL.
+
+### 2. Validar saúde da API
+
+```bash
+curl http://localhost:8080/actuator/health
+```
+
+Resposta esperada:
+
+```json
+{"status":"UP"}
+```
+
+### 3. Acessar Swagger
+
+```text
+http://localhost:8080/swagger-ui/index.html
+```
+
+Também pode funcionar via:
+
+```text
+http://localhost:8080/swagger-ui.html
+```
+
+### 4. Fazer login administrativo
+
+Endpoint:
+
+```http
+POST /api/v1/auth/login
+```
+
+Payload:
+
+```json
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+
+Copie o campo `accessToken`, clique em `Authorize` no Swagger e informe:
+
+```text
+Bearer SEU_TOKEN_AQUI
+```
+
+### 5. Executar fluxo principal da OS
+
+Crie uma ordem de serviço:
+
+```http
+POST /api/v1/admin/work-orders
+```
+
+Payload:
+
+```json
+{
+  "customer": {
+    "fullName": "Maria Silva",
+    "documentType": "CPF",
+    "documentNumber": "529.982.247-25",
+    "email": "maria@email.com",
+    "phone": "31999999999"
+  },
+  "vehicle": {
+    "plate": "ABC1D23",
+    "brand": "Fiat",
+    "model": "Argo",
+    "manufacturingYear": 2020
+  },
+  "services": [
+    {
+      "serviceId": "11111111-1111-1111-1111-111111111111",
+      "quantity": 1
+    }
+  ],
+  "parts": [
+    {
+      "partId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "quantity": 1
+    }
+  ],
+  "diagnosticNotes": "Cliente solicitou manutenção preventiva."
+}
+```
+
+Copie da resposta:
+
+- `id`: usado nos próximos endpoints administrativos;
+- `code`: usado na consulta pública do cliente;
+- `status`: esperado como `WAITING_APPROVAL`, pois a OS já nasce com orçamento calculado.
+
+Depois execute, nesta ordem:
+
+```http
+POST /api/v1/admin/work-orders/{id}/approve
+POST /api/v1/admin/work-orders/{id}/finish
+POST /api/v1/admin/work-orders/{id}/deliver
+```
+
+O endpoint `POST /api/v1/admin/work-orders/{id}/diagnosis/start` é usado para OS em `RECEIVED`. No fluxo acima, a OS já vai para `WAITING_APPROVAL`; se chamar diagnóstico nesse estado, a API retorna `422 Unprocessable Entity`, porque viola a transição permitida do domínio.
+
+### 6. Consultar andamento pelo cliente
+
+```http
+GET /api/v1/public/work-orders/{code}/status?document=52998224725
+```
+
+Esse endpoint é público, mas exige o documento do cliente para evitar consulta aberta somente pelo código da OS.
+
+### 7. Consultar tempo médio de execução
+
+Sem filtro:
+
+```http
+GET /api/v1/admin/metrics/average-execution-time
+```
+
+Com intervalo:
+
+```http
+GET /api/v1/admin/metrics/average-execution-time?from=2026-06-30T00:00:00-03:00&to=2026-06-30T23:59:59-03:00
+```
+
+Os filtros `from` e `to` são opcionais e usam data/hora ISO com offset.
+
+### 8. Testar CRUDs administrativos
+
+Com o token JWT, os avaliadores também podem validar pelo Swagger:
+
+- clientes: `/api/v1/admin/customers`;
+- veículos: `/api/v1/admin/vehicles`;
+- serviços: `/api/v1/admin/services`;
+- peças e estoque: `/api/v1/admin/parts`;
+- ordens de serviço: `/api/v1/admin/work-orders`.
+
+---
+
+## Execução local
 
 ### Pré-requisitos
 
 - Docker
 - Docker Compose
 
-### Subir ambiente completo
+### Docker Compose
 
-Na raiz do projeto:
+Subir ambiente completo:
 
 ```bash
 docker compose up --build
@@ -176,9 +344,17 @@ username: oficina
 password: oficina
 ```
 
----
+Para conectar no DBeaver ou outro client SQL:
 
-## Como executar localmente sem Docker para a aplicação
+```text
+host: localhost
+port: 5432
+database: oficina_db
+username: oficina
+password: oficina
+```
+
+### Aplicação fora do Docker
 
 Suba apenas o PostgreSQL:
 
@@ -217,7 +393,7 @@ APP_ADMIN_DEFAULT_PASSWORD
 Com a aplicação rodando, acesse:
 
 ```text
-http://localhost:8080/swagger-ui.html
+http://localhost:8080/swagger-ui/index.html
 ```
 
 Fluxo recomendado no Swagger:
@@ -367,10 +543,30 @@ GET /api/v1/public/work-orders/{code}/status?document=52998224725
 GET /api/v1/admin/metrics/average-execution-time
 ```
 
-Com filtro opcional:
+Os parâmetros `from` e `to` são opcionais e filtram pela data de finalização da OS (`finishedAt`).
+
+Sem filtro:
 
 ```http
-GET /api/v1/admin/metrics/average-execution-time?from=2026-06-01T00:00:00Z&to=2026-06-30T23:59:59Z
+GET /api/v1/admin/metrics/average-execution-time
+```
+
+Somente data inicial:
+
+```http
+GET /api/v1/admin/metrics/average-execution-time?from=2026-06-30T00:00:00-03:00
+```
+
+Somente data final:
+
+```http
+GET /api/v1/admin/metrics/average-execution-time?to=2026-06-30T23:59:59-03:00
+```
+
+Intervalo completo:
+
+```http
+GET /api/v1/admin/metrics/average-execution-time?from=2026-06-30T00:00:00-03:00&to=2026-06-30T23:59:59-03:00
 ```
 
 ---

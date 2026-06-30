@@ -161,7 +161,7 @@ public class WorkOrderApplicationService {
 
     @Transactional(readOnly = true)
     public AverageExecutionTimeResponse averageExecutionTime(OffsetDateTime from, OffsetDateTime to) {
-        var orders = workOrderRepository.findCompletedForMetrics(from, to);
+        var orders = findCompletedForMetrics(from, to);
         var executionMinutes = orders.stream()
             .map(WorkOrder::executionMinutes)
             .filter(minutes -> minutes != null && minutes >= 0)
@@ -173,6 +173,19 @@ public class WorkOrderApplicationService {
 
         double averageMinutes = executionMinutes.stream().mapToLong(Long::longValue).average().orElse(0);
         return new AverageExecutionTimeResponse(executionMinutes.size(), averageMinutes, averageMinutes / 60.0);
+    }
+
+    private List<WorkOrder> findCompletedForMetrics(OffsetDateTime from, OffsetDateTime to) {
+        if (from != null && to != null) {
+            return workOrderRepository.findCompletedForMetricsBetween(from, to);
+        }
+        if (from != null) {
+            return workOrderRepository.findCompletedForMetricsFrom(from);
+        }
+        if (to != null) {
+            return workOrderRepository.findCompletedForMetricsTo(to);
+        }
+        return workOrderRepository.findCompletedForMetrics();
     }
 
     private Customer resolveCustomer(CreateWorkOrderRequest request) {

@@ -59,8 +59,36 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, UUID> {
         from WorkOrder w
         where w.startedAt is not null
           and w.finishedAt is not null
-          and (:from is null or w.finishedAt >= :from)
-          and (:to is null or w.finishedAt <= :to)
         """)
-    List<WorkOrder> findCompletedForMetrics(@Param("from") OffsetDateTime from, @Param("to") OffsetDateTime to);
+    List<WorkOrder> findCompletedForMetrics();
+
+    @Query("""
+        select w
+        from WorkOrder w
+        where w.startedAt is not null
+          and w.finishedAt is not null
+          and w.finishedAt >= :from
+        """)
+    List<WorkOrder> findCompletedForMetricsFrom(@Param("from") OffsetDateTime from);
+
+    @Query("""
+        select w
+        from WorkOrder w
+        where w.startedAt is not null
+          and w.finishedAt is not null
+          and w.finishedAt <= :to
+        """)
+    List<WorkOrder> findCompletedForMetricsTo(@Param("to") OffsetDateTime to);
+
+    @Query("""
+        select w
+        from WorkOrder w
+        where w.startedAt is not null
+          and w.finishedAt is not null
+          and w.finishedAt between :from and :to
+        """)
+    List<WorkOrder> findCompletedForMetricsBetween(
+        @Param("from") OffsetDateTime from,
+        @Param("to") OffsetDateTime to
+    );
 }
