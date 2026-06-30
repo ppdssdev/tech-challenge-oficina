@@ -1,0 +1,45 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: oficina-api
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/oficina_db}
+    username: ${SPRING_DATASOURCE_USERNAME:oficina}
+    password: ${SPRING_DATASOURCE_PASSWORD:oficina}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: non_null
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:awssecretpostech-oficina-fiap-2026}
+    expiration-minutes: ${APP_JWT_EXPIRATION_MINUTES:120}
+  admin:
+    default-username: ${APP_ADMIN_DEFAULT_USERNAME:admin}
+    default-password: ${APP_ADMIN_DEFAULT_PASSWORD:admin123}

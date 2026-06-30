@@ -1,0 +1,46 @@
+# Build outputs
+target/
+out/
+build/
+
+# Maven
+.mvn/timing.properties
+
+# IDEs and editors
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Runtime files
+*.pid
+*.seed
+*.pid.lock
+hs_err_pid*
+replay_pid*
+
+# Test and coverage reports
+coverage/
+.coverage
+*.lcov
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
