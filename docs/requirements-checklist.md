@@ -23,7 +23,7 @@
 | JWT | `/api/v1/auth/login` + `JwtAuthenticationFilter` |
 | Validação CPF/CNPJ | Value Object `DocumentNumber` + `DocumentValidator` |
 | Validação placa | Value Object `VehiclePlate` + `VehiclePlateValidator` |
-| Swagger | `springdoc-openapi` em `/swagger-ui.html` |
+| Swagger | `springdoc-openapi` em `/swagger-ui/index.html` e `/swagger-ui.html` |
 | Dockerfile | `Dockerfile` |
 | docker-compose | `docker-compose.yml` com API + PostgreSQL |
 | Imagem Docker segura | Imagem final Alpine, pacotes atualizados e usuário não-root |

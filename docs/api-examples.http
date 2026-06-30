@@ -82,3 +82,19 @@ Authorization: Bearer {{token}}
 
 ### Consulta pública do cliente
 GET http://localhost:8080/api/v1/public/work-orders/{{workOrderCode}}/status?document=52998224725
+
+### Tempo médio de execução sem filtro
+GET http://localhost:8080/api/v1/admin/metrics/average-execution-time
+Authorization: Bearer {{token}}
+
+### Tempo médio de execução com data inicial
+GET http://localhost:8080/api/v1/admin/metrics/average-execution-time?from=2026-06-30T00:00:00-03:00
+Authorization: Bearer {{token}}
+
+### Tempo médio de execução com data final
+GET http://localhost:8080/api/v1/admin/metrics/average-execution-time?to=2026-06-30T23:59:59-03:00
+Authorization: Bearer {{token}}
+
+### Tempo médio de execução com intervalo completo
+GET http://localhost:8080/api/v1/admin/metrics/average-execution-time?from=2026-06-30T00:00:00-03:00&to=2026-06-30T23:59:59-03:00
+Authorization: Bearer {{token}}
