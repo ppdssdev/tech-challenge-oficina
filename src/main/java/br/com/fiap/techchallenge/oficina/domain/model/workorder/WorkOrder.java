@@ -6,17 +6,6 @@ import br.com.fiap.techchallenge.oficina.domain.model.catalog.Part;
 import br.com.fiap.techchallenge.oficina.domain.model.catalog.ServiceCatalogItem;
 import br.com.fiap.techchallenge.oficina.domain.model.customer.Customer;
 import br.com.fiap.techchallenge.oficina.domain.model.vehicle.Vehicle;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OrderBy;
-import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
@@ -26,61 +15,25 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
-@Entity
-@Table(name = "work_orders")
 public class WorkOrder extends BaseEntity {
 
-    @Column(nullable = false, unique = true, length = 30)
-    private String code;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "customer_id", nullable = false)
-    private Customer customer;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "vehicle_id", nullable = false)
-    private Vehicle vehicle;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    private final String code;
+    private final Customer customer;
+    private final Vehicle vehicle;
     private WorkOrderStatus status;
-
-    @Column(name = "diagnostic_notes", length = 2000)
     private String diagnosticNotes;
-
-    @Column(name = "customer_authorized_at")
     private OffsetDateTime customerAuthorizedAt;
-
-    @Column(name = "started_at")
     private OffsetDateTime startedAt;
-
-    @Column(name = "finished_at")
     private OffsetDateTime finishedAt;
-
-    @Column(name = "delivered_at")
     private OffsetDateTime deliveredAt;
-
-    @Column(name = "total_services", nullable = false, precision = 12, scale = 2)
-    private BigDecimal totalServices = BigDecimal.ZERO.setScale(2);
-
-    @Column(name = "total_parts", nullable = false, precision = 12, scale = 2)
-    private BigDecimal totalParts = BigDecimal.ZERO.setScale(2);
-
-    @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
-    private BigDecimal totalAmount = BigDecimal.ZERO.setScale(2);
-
-    @OneToMany(mappedBy = "workOrder", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("createdAt ASC")
-    private List<WorkOrderServiceItem> serviceItems = new ArrayList<>();
-
-    @OneToMany(mappedBy = "workOrder", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("createdAt ASC")
-    private List<WorkOrderPartItem> partItems = new ArrayList<>();
-
-    protected WorkOrder() {
-    }
+    private BigDecimal totalServices = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    private BigDecimal totalParts = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    private BigDecimal totalAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    private final List<WorkOrderServiceItem> serviceItems = new ArrayList<>();
+    private final List<WorkOrderPartItem> partItems = new ArrayList<>();
 
     public WorkOrder(String code, Customer customer, Vehicle vehicle, String diagnosticNotes) {
         if (code == null || code.isBlank()) {
@@ -97,6 +50,58 @@ public class WorkOrder extends BaseEntity {
         this.vehicle = vehicle;
         this.status = WorkOrderStatus.RECEIVED;
         this.diagnosticNotes = normalize(diagnosticNotes);
+    }
+
+    public static WorkOrder restore(
+        UUID id,
+        String code,
+        Customer customer,
+        Vehicle vehicle,
+        WorkOrderStatus status,
+        String diagnosticNotes,
+        OffsetDateTime customerAuthorizedAt,
+        OffsetDateTime startedAt,
+        OffsetDateTime finishedAt,
+        OffsetDateTime deliveredAt,
+        BigDecimal totalServices,
+        BigDecimal totalParts,
+        BigDecimal totalAmount,
+        List<ServiceItemSnapshot> services,
+        List<PartItemSnapshot> parts,
+        OffsetDateTime createdAt,
+        OffsetDateTime updatedAt
+    ) {
+        var order = new WorkOrder(code, customer, vehicle, diagnosticNotes);
+        order.status = status;
+        order.customerAuthorizedAt = customerAuthorizedAt;
+        order.startedAt = startedAt;
+        order.finishedAt = finishedAt;
+        order.deliveredAt = deliveredAt;
+        order.totalServices = totalServices;
+        order.totalParts = totalParts;
+        order.totalAmount = totalAmount;
+        order.restoreMetadata(id, createdAt, updatedAt);
+        services.forEach(snapshot -> order.serviceItems.add(WorkOrderServiceItem.restore(
+            snapshot.id(), order, snapshot.service(), snapshot.serviceName(), snapshot.unitPrice(),
+            snapshot.quantity(), snapshot.estimatedMinutes(), snapshot.lineTotal(), snapshot.createdAt(), snapshot.updatedAt()
+        )));
+        parts.forEach(snapshot -> order.partItems.add(WorkOrderPartItem.restore(
+            snapshot.id(), order, snapshot.part(), snapshot.partName(), snapshot.sku(), snapshot.unitPrice(),
+            snapshot.quantity(), snapshot.lineTotal(), snapshot.stockReserved(), snapshot.createdAt(), snapshot.updatedAt()
+        )));
+        return order;
+    }
+
+    public record ServiceItemSnapshot(
+        UUID id, ServiceCatalogItem service, String serviceName, BigDecimal unitPrice, int quantity,
+        int estimatedMinutes, BigDecimal lineTotal, OffsetDateTime createdAt, OffsetDateTime updatedAt
+    ) {
+    }
+
+    public record PartItemSnapshot(
+        UUID id, Part part, String partName, String sku, BigDecimal unitPrice, int quantity,
+        BigDecimal lineTotal, boolean stockReserved, OffsetDateTime createdAt, OffsetDateTime updatedAt
+    ) {
     }
 
     public void addRequestedService(ServiceCatalogItem service, int quantity) {

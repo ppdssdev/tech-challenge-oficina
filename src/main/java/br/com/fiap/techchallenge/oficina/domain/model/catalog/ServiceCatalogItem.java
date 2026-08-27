@@ -2,36 +2,31 @@ package br.com.fiap.techchallenge.oficina.domain.model.catalog;
 
 import br.com.fiap.techchallenge.oficina.domain.exception.BusinessException;
 import br.com.fiap.techchallenge.oficina.domain.model.base.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 
-@Entity
-@Table(name = "service_catalog_items")
 public class ServiceCatalogItem extends BaseEntity {
 
-    @Column(nullable = false, length = 100)
     private String name;
-
-    @Column(length = 500)
     private String description;
-
-    @Column(name = "base_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal basePrice;
-
-    @Column(name = "estimated_minutes", nullable = false)
     private int estimatedMinutes;
-
-    @Column(nullable = false)
     private boolean active = true;
-
-    protected ServiceCatalogItem() {
-    }
 
     public ServiceCatalogItem(String name, String description, BigDecimal basePrice, int estimatedMinutes) {
         update(name, description, basePrice, estimatedMinutes, true);
+    }
+
+    public static ServiceCatalogItem restore(
+        UUID id, String name, String description, BigDecimal basePrice, int estimatedMinutes,
+        boolean active, OffsetDateTime createdAt, OffsetDateTime updatedAt
+    ) {
+        var item = new ServiceCatalogItem(name, description, basePrice, estimatedMinutes);
+        item.active = active;
+        item.restoreMetadata(id, createdAt, updatedAt);
+        return item;
     }
 
     public void update(String name, String description, BigDecimal basePrice, int estimatedMinutes, boolean active) {

@@ -3,44 +3,19 @@ package br.com.fiap.techchallenge.oficina.domain.model.workorder;
 import br.com.fiap.techchallenge.oficina.domain.exception.BusinessException;
 import br.com.fiap.techchallenge.oficina.domain.model.base.BaseEntity;
 import br.com.fiap.techchallenge.oficina.domain.model.catalog.ServiceCatalogItem;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 
-@Entity
-@Table(name = "work_order_service_items")
 public class WorkOrderServiceItem extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "work_order_id", nullable = false)
-    private WorkOrder workOrder;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "service_id", nullable = false)
-    private ServiceCatalogItem service;
-
-    @Column(name = "service_name", nullable = false, length = 100)
+    private final ServiceCatalogItem service;
     private String serviceName;
-
-    @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
-
-    @Column(nullable = false)
-    private int quantity;
-
-    @Column(name = "estimated_minutes", nullable = false)
+    private final int quantity;
     private int estimatedMinutes;
-
-    @Column(name = "line_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal lineTotal;
-
-    protected WorkOrderServiceItem() {
-    }
 
     public WorkOrderServiceItem(WorkOrder workOrder, ServiceCatalogItem service, int quantity) {
         if (workOrder == null || service == null) {
@@ -53,7 +28,6 @@ public class WorkOrderServiceItem extends BaseEntity {
             throw new BusinessException("Quantidade do serviço deve ser maior que zero.");
         }
 
-        this.workOrder = workOrder;
         this.service = service;
         this.serviceName = service.getName();
         this.unitPrice = service.getBasePrice();
@@ -62,8 +36,18 @@ public class WorkOrderServiceItem extends BaseEntity {
         this.lineTotal = unitPrice.multiply(BigDecimal.valueOf(quantity)).setScale(2, RoundingMode.HALF_UP);
     }
 
-    public WorkOrder getWorkOrder() {
-        return workOrder;
+    static WorkOrderServiceItem restore(
+        UUID id, WorkOrder workOrder, ServiceCatalogItem service, String serviceName,
+        BigDecimal unitPrice, int quantity, int estimatedMinutes, BigDecimal lineTotal,
+        OffsetDateTime createdAt, OffsetDateTime updatedAt
+    ) {
+        var item = new WorkOrderServiceItem(workOrder, service, quantity);
+        item.serviceName = serviceName;
+        item.unitPrice = unitPrice;
+        item.estimatedMinutes = estimatedMinutes;
+        item.lineTotal = lineTotal;
+        item.restoreMetadata(id, createdAt, updatedAt);
+        return item;
     }
 
     public ServiceCatalogItem getService() {

@@ -1,6 +1,6 @@
 package br.com.fiap.techchallenge.oficina.api;
 
-import br.com.fiap.techchallenge.oficina.api.controller.ApiExceptionHandler;
+import br.com.fiap.techchallenge.oficina.adapters.in.web.ApiExceptionHandler;
 import br.com.fiap.techchallenge.oficina.domain.exception.BusinessException;
 import br.com.fiap.techchallenge.oficina.domain.exception.ConflictException;
 import br.com.fiap.techchallenge.oficina.domain.exception.NotFoundException;

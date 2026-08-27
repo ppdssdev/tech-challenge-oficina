@@ -3,47 +3,20 @@ package br.com.fiap.techchallenge.oficina.domain.model.workorder;
 import br.com.fiap.techchallenge.oficina.domain.exception.BusinessException;
 import br.com.fiap.techchallenge.oficina.domain.model.base.BaseEntity;
 import br.com.fiap.techchallenge.oficina.domain.model.catalog.Part;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 
-@Entity
-@Table(name = "work_order_part_items")
 public class WorkOrderPartItem extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "work_order_id", nullable = false)
-    private WorkOrder workOrder;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "part_id", nullable = false)
-    private Part part;
-
-    @Column(name = "part_name", nullable = false, length = 120)
+    private final Part part;
     private String partName;
-
-    @Column(name = "sku", nullable = false, length = 40)
     private String sku;
-
-    @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
-
-    @Column(nullable = false)
-    private int quantity;
-
-    @Column(name = "line_total", nullable = false, precision = 12, scale = 2)
+    private final int quantity;
     private BigDecimal lineTotal;
-
-    @Column(name = "stock_reserved", nullable = false)
     private boolean stockReserved;
-
-    protected WorkOrderPartItem() {
-    }
 
     public WorkOrderPartItem(WorkOrder workOrder, Part part, int quantity) {
         if (workOrder == null || part == null) {
@@ -59,7 +32,6 @@ public class WorkOrderPartItem extends BaseEntity {
             throw new BusinessException("Estoque insuficiente para a peça " + part.getSku() + ".");
         }
 
-        this.workOrder = workOrder;
         this.part = part;
         this.partName = part.getName();
         this.sku = part.getSku();
@@ -69,15 +41,26 @@ public class WorkOrderPartItem extends BaseEntity {
         this.stockReserved = false;
     }
 
+    static WorkOrderPartItem restore(
+        UUID id, WorkOrder workOrder, Part part, String partName, String sku,
+        BigDecimal unitPrice, int quantity, BigDecimal lineTotal, boolean stockReserved,
+        OffsetDateTime createdAt, OffsetDateTime updatedAt
+    ) {
+        var item = new WorkOrderPartItem(workOrder, part, quantity);
+        item.partName = partName;
+        item.sku = sku;
+        item.unitPrice = unitPrice;
+        item.lineTotal = lineTotal;
+        item.stockReserved = stockReserved;
+        item.restoreMetadata(id, createdAt, updatedAt);
+        return item;
+    }
+
     public void reserveStock() {
         if (!stockReserved) {
             part.decreaseStock(quantity);
             stockReserved = true;
         }
-    }
-
-    public WorkOrder getWorkOrder() {
-        return workOrder;
     }
 
     public Part getPart() {

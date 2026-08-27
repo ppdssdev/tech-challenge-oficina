@@ -1,30 +1,28 @@
 package br.com.fiap.techchallenge.oficina.domain.model.user;
 
 import br.com.fiap.techchallenge.oficina.domain.model.base.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 
-@Entity
-@Table(name = "app_users")
-public class AppUser extends BaseEntity {
+public final class AppUser extends BaseEntity {
 
-    @Column(nullable = false, unique = true, length = 80)
-    private String username;
-
-    @Column(name = "password_hash", nullable = false, length = 120)
-    private String passwordHash;
-
-    @Column(nullable = false, length = 30)
-    private String role;
-
-    protected AppUser() {
-    }
+    private final String username;
+    private final String passwordHash;
+    private final String role;
 
     public AppUser(String username, String passwordHash, String role) {
         this.username = username;
         this.passwordHash = passwordHash;
         this.role = role;
+    }
+
+    public static AppUser restore(
+        UUID id, String username, String passwordHash, String role,
+        OffsetDateTime createdAt, OffsetDateTime updatedAt
+    ) {
+        var user = new AppUser(username, passwordHash, role);
+        user.restoreMetadata(id, createdAt, updatedAt);
+        return user;
     }
 
     public String getUsername() {

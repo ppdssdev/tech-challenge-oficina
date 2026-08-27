@@ -2,45 +2,34 @@ package br.com.fiap.techchallenge.oficina.domain.model.catalog;
 
 import br.com.fiap.techchallenge.oficina.domain.exception.BusinessException;
 import br.com.fiap.techchallenge.oficina.domain.model.base.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 
-@Entity
-@Table(name = "parts")
 public class Part extends BaseEntity {
 
-    @Column(nullable = false, length = 120)
     private String name;
-
-    @Column(nullable = false, unique = true, length = 40)
     private String sku;
-
-    @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
-
-    @Column(name = "quantity_in_stock", nullable = false)
     private int quantityInStock;
-
-    @Column(name = "minimum_stock", nullable = false)
     private int minimumStock;
-
-    @Column(nullable = false)
     private boolean active = true;
-
-    @SuppressWarnings("unused")
-    @Version
-    @Column(nullable = false)
     private long version;
-
-    protected Part() {
-    }
 
     public Part(String name, String sku, BigDecimal unitPrice, int quantityInStock, int minimumStock) {
         update(name, sku, unitPrice, quantityInStock, minimumStock, true);
+    }
+
+    public static Part restore(
+        UUID id, String name, String sku, BigDecimal unitPrice, int quantityInStock,
+        int minimumStock, boolean active, long version, OffsetDateTime createdAt, OffsetDateTime updatedAt
+    ) {
+        var part = new Part(name, sku, unitPrice, quantityInStock, minimumStock);
+        part.active = active;
+        part.version = version;
+        part.restoreMetadata(id, createdAt, updatedAt);
+        return part;
     }
 
     public void update(String name, String sku, BigDecimal unitPrice, int quantityInStock, int minimumStock, boolean active) {

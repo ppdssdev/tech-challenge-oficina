@@ -4,6 +4,7 @@ import br.com.fiap.techchallenge.oficina.OficinaApplication;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +16,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -23,6 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(classes = OficinaApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 class WorkOrderFlowIntegrationTest {
+
+    private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT =
+        new ParameterizedTypeReference<>() { };
 
     @LocalServerPort
     int port;
@@ -38,33 +43,35 @@ class WorkOrderFlowIntegrationTest {
         UUID serviceId = createService(adminHeaders);
         UUID partId = createPart(adminHeaders);
 
-        ResponseEntity<Map> createOrderResponse = createOrder(adminHeaders, serviceId, partId);
+        ResponseEntity<Map<String, Object>> createOrderResponse = createOrder(adminHeaders, serviceId, partId);
 
         assertThat(createOrderResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(createOrderResponse.getBody()).isNotNull();
-        assertThat(createOrderResponse.getBody().get("status")).isEqualTo("WAITING_APPROVAL");
-        assertThat(new BigDecimal(createOrderResponse.getBody().get("totalAmount").toString())).isEqualByComparingTo("190.00");
+        assertThat(requiredValue(createOrderResponse, "status")).isEqualTo("WAITING_APPROVAL");
+        assertThat(new BigDecimal(requiredValue(createOrderResponse, "totalAmount").toString())).isEqualByComparingTo("190.00");
 
-        String orderId = createOrderResponse.getBody().get("id").toString();
-        String code = createOrderResponse.getBody().get("code").toString();
+        String orderId = requiredValue(createOrderResponse, "id").toString();
+        String code = requiredValue(createOrderResponse, "code").toString();
 
-        ResponseEntity<Map> approved = postWithoutBody("/api/v1/admin/work-orders/" + orderId + "/approve", adminHeaders);
+        ResponseEntity<Map<String, Object>> approved = postWithoutBody("/api/v1/admin/work-orders/" + orderId + "/approve", adminHeaders);
         assertThat(approved.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(approved.getBody().get("status")).isEqualTo("IN_EXECUTION");
+        assertThat(requiredValue(approved, "status")).isEqualTo("IN_EXECUTION");
 
-        ResponseEntity<Map> finished = postWithoutBody("/api/v1/admin/work-orders/" + orderId + "/finish", adminHeaders);
+        ResponseEntity<Map<String, Object>> finished = postWithoutBody("/api/v1/admin/work-orders/" + orderId + "/finish", adminHeaders);
         assertThat(finished.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(finished.getBody().get("status")).isEqualTo("FINALIZED");
+        assertThat(requiredValue(finished, "status")).isEqualTo("FINALIZED");
 
-        ResponseEntity<Map> delivered = postWithoutBody("/api/v1/admin/work-orders/" + orderId + "/deliver", adminHeaders);
+        ResponseEntity<Map<String, Object>> delivered = postWithoutBody("/api/v1/admin/work-orders/" + orderId + "/deliver", adminHeaders);
         assertThat(delivered.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(delivered.getBody().get("status")).isEqualTo("DELIVERED");
+        assertThat(requiredValue(delivered, "status")).isEqualTo("DELIVERED");
 
-        ResponseEntity<Map> publicStatus = restTemplate.getForEntity(
-            url("/api/v1/public/work-orders/" + code + "/status?document=52998224725"), Map.class
+        ResponseEntity<Map<String, Object>> publicStatus = restTemplate.exchange(
+            url("/api/v1/public/work-orders/" + code + "/status?document=52998224725"),
+            HttpMethod.GET,
+            HttpEntity.EMPTY,
+            JSON_OBJECT
         );
         assertThat(publicStatus.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(publicStatus.getBody().get("status")).isEqualTo("DELIVERED");
+        assertThat(requiredValue(publicStatus, "status")).isEqualTo("DELIVERED");
     }
 
     @Test
@@ -82,11 +89,14 @@ class WorkOrderFlowIntegrationTest {
         HttpHeaders adminHeaders = adminHeaders(token);
         UUID serviceId = createService(adminHeaders);
         UUID partId = createPart(adminHeaders);
-        ResponseEntity<Map> createOrderResponse = createOrder(adminHeaders, serviceId, partId);
-        String code = createOrderResponse.getBody().get("code").toString();
+        ResponseEntity<Map<String, Object>> createOrderResponse = createOrder(adminHeaders, serviceId, partId);
+        String code = requiredValue(createOrderResponse, "code").toString();
 
-        ResponseEntity<Map> publicStatus = restTemplate.getForEntity(
-            url("/api/v1/public/work-orders/" + code + "/status?document=00000000000"), Map.class
+        ResponseEntity<Map<String, Object>> publicStatus = restTemplate.exchange(
+            url("/api/v1/public/work-orders/" + code + "/status?document=00000000000"),
+            HttpMethod.GET,
+            HttpEntity.EMPTY,
+            JSON_OBJECT
         );
 
         assertThat(publicStatus.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -95,18 +105,18 @@ class WorkOrderFlowIntegrationTest {
     private String login() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        ResponseEntity<Map> response = restTemplate.exchange(
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
             url("/api/v1/auth/login"),
             HttpMethod.POST,
             new HttpEntity<>(Map.of("username", "admin", "password", "admin123"), headers),
-            Map.class
+            JSON_OBJECT
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        return response.getBody().get("accessToken").toString();
+        return requiredValue(response, "accessToken").toString();
     }
 
     private UUID createService(HttpHeaders headers) {
-        ResponseEntity<Map> response = restTemplate.exchange(
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
             url("/api/v1/admin/services"),
             HttpMethod.POST,
             new HttpEntity<>(Map.of(
@@ -116,13 +126,13 @@ class WorkOrderFlowIntegrationTest {
                 "estimatedMinutes", 40,
                 "active", true
             ), headers),
-            Map.class
+            JSON_OBJECT
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        return UUID.fromString(response.getBody().get("id").toString());
+        return UUID.fromString(requiredValue(response, "id").toString());
     }
 
-    private ResponseEntity<Map> createOrder(HttpHeaders headers, UUID serviceId, UUID partId) {
+    private ResponseEntity<Map<String, Object>> createOrder(HttpHeaders headers, UUID serviceId, UUID partId) {
         Map<String, Object> createOrderPayload = Map.of(
             "customer", Map.of(
                 "fullName", "Maria Silva",
@@ -143,12 +153,12 @@ class WorkOrderFlowIntegrationTest {
         );
 
         return restTemplate.exchange(
-            url("/api/v1/admin/work-orders"), HttpMethod.POST, new HttpEntity<>(createOrderPayload, headers), Map.class
+            url("/api/v1/admin/work-orders"), HttpMethod.POST, new HttpEntity<>(createOrderPayload, headers), JSON_OBJECT
         );
     }
 
     private UUID createPart(HttpHeaders headers) {
-        ResponseEntity<Map> response = restTemplate.exchange(
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
             url("/api/v1/admin/parts"),
             HttpMethod.POST,
             new HttpEntity<>(Map.of(
@@ -159,14 +169,14 @@ class WorkOrderFlowIntegrationTest {
                 "minimumStock", 2,
                 "active", true
             ), headers),
-            Map.class
+            JSON_OBJECT
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        return UUID.fromString(response.getBody().get("id").toString());
+        return UUID.fromString(requiredValue(response, "id").toString());
     }
 
-    private ResponseEntity<Map> postWithoutBody(String path, HttpHeaders headers) {
-        return restTemplate.exchange(url(path), HttpMethod.POST, new HttpEntity<>(headers), Map.class);
+    private ResponseEntity<Map<String, Object>> postWithoutBody(String path, HttpHeaders headers) {
+        return restTemplate.exchange(url(path), HttpMethod.POST, new HttpEntity<>(headers), JSON_OBJECT);
     }
 
     private HttpHeaders adminHeaders(String token) {
@@ -174,6 +184,11 @@ class WorkOrderFlowIntegrationTest {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(token);
         return headers;
+    }
+
+    private static Object requiredValue(ResponseEntity<Map<String, Object>> response, String field) {
+        Map<String, Object> body = Objects.requireNonNull(response.getBody(), "Resposta sem corpo");
+        return Objects.requireNonNull(body.get(field), "Campo ausente na resposta: " + field);
     }
 
     private String url(String path) {

@@ -2,18 +2,11 @@ package br.com.fiap.techchallenge.oficina.domain.model.vehicle;
 
 import br.com.fiap.techchallenge.oficina.domain.exception.BusinessException;
 import br.com.fiap.techchallenge.oficina.domain.service.VehiclePlateValidator;
-import jakarta.persistence.Column;
-import jakarta.persistence.Embeddable;
 import java.util.Objects;
 
-@Embeddable
-public class VehiclePlate {
+public final class VehiclePlate {
 
-    @Column(nullable = false, length = 7)
-    private String value;
-
-    protected VehiclePlate() {
-    }
+    private final String value;
 
     public VehiclePlate(String value) {
         String normalizedValue = VehiclePlateValidator.normalize(value);

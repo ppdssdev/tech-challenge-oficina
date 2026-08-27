@@ -2,24 +2,12 @@ package br.com.fiap.techchallenge.oficina.domain.model.customer;
 
 import br.com.fiap.techchallenge.oficina.domain.exception.BusinessException;
 import br.com.fiap.techchallenge.oficina.domain.service.DocumentValidator;
-import jakarta.persistence.Column;
-import jakarta.persistence.Embeddable;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import java.util.Objects;
 
-@Embeddable
-public class DocumentNumber {
+public final class DocumentNumber {
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 4)
-    private DocumentType type;
-
-    @Column(nullable = false, length = 14)
-    private String value;
-
-    protected DocumentNumber() {
-    }
+    private final DocumentType type;
+    private final String value;
 
     public DocumentNumber(DocumentType type, String value) {
         if (type == null) {
