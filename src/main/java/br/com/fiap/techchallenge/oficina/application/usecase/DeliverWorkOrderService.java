@@ -1,11 +1,13 @@
 package br.com.fiap.techchallenge.oficina.application.usecase;
 
 import br.com.fiap.techchallenge.oficina.application.port.in.DeliverWorkOrderUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.WorkOrderResult;
 import br.com.fiap.techchallenge.oficina.application.port.out.TransactionPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.WorkOrderRepositoryPort;
 import br.com.fiap.techchallenge.oficina.domain.exception.NotFoundException;
-import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
 import java.util.UUID;
+
+import static br.com.fiap.techchallenge.oficina.application.usecase.mapper.ApplicationResultMapper.toResult;
 
 public final class DeliverWorkOrderService implements DeliverWorkOrderUseCase {
     private final WorkOrderRepositoryPort workOrders;
@@ -17,12 +19,12 @@ public final class DeliverWorkOrderService implements DeliverWorkOrderUseCase {
     }
 
     @Override
-    public WorkOrder deliver(UUID id) {
+    public WorkOrderResult deliver(UUID id) {
         return transactions.required(() -> {
             var order = workOrders.findDetailedById(id)
                 .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
             order.deliver();
-            return workOrders.save(order);
+            return toResult(workOrders.save(order));
         });
     }
 }

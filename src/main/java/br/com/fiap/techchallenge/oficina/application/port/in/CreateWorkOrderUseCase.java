@@ -1,12 +1,12 @@
 package br.com.fiap.techchallenge.oficina.application.port.in;
 
 import br.com.fiap.techchallenge.oficina.domain.model.customer.DocumentType;
-import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.WorkOrderResult;
 import java.util.List;
 import java.util.UUID;
 
 public interface CreateWorkOrderUseCase {
-    WorkOrder create(Command command);
+    WorkOrderResult create(Command command);
 
     record Command(
         CustomerData customer,

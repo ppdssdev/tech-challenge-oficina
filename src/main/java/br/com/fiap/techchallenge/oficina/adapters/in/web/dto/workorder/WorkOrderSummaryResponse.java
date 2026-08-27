@@ -1,6 +1,5 @@
 package br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder;
 
-import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
 import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrderStatus;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -19,19 +18,4 @@ public record WorkOrderSummaryResponse(
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt
 ) {
-    public static WorkOrderSummaryResponse from(WorkOrder order) {
-        return new WorkOrderSummaryResponse(
-            order.getId(),
-            order.getCode(),
-            order.getStatus(),
-            order.getStatus().getLabel(),
-            order.getCustomer().getFullName(),
-            order.getCustomer().getDocumentNumber(),
-            order.getVehicle().getPlate(),
-            order.getVehicle().getBrand() + " " + order.getVehicle().getModel(),
-            order.getTotalAmount(),
-            order.getCreatedAt(),
-            order.getUpdatedAt()
-        );
-    }
 }

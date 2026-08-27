@@ -1,9 +1,9 @@
-package br.com.fiap.techchallenge.oficina.adapters.in.web.dto.vehicle;
+package br.com.fiap.techchallenge.oficina.application.port.in.result;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-public record VehicleResponse(
+public record VehicleResult(
     UUID id,
     UUID customerId,
     String customerName,

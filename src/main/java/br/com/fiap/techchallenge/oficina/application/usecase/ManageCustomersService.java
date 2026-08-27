@@ -1,14 +1,18 @@
 package br.com.fiap.techchallenge.oficina.application.usecase;
 
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageCustomersUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.CustomerResult;
 import br.com.fiap.techchallenge.oficina.application.port.out.CustomerRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.TransactionPort;
+import br.com.fiap.techchallenge.oficina.application.usecase.mapper.ApplicationResultMapper;
 import br.com.fiap.techchallenge.oficina.domain.exception.ConflictException;
 import br.com.fiap.techchallenge.oficina.domain.exception.NotFoundException;
 import br.com.fiap.techchallenge.oficina.domain.model.customer.Customer;
 import br.com.fiap.techchallenge.oficina.domain.service.DocumentValidator;
 import java.util.List;
 import java.util.UUID;
+
+import static br.com.fiap.techchallenge.oficina.application.usecase.mapper.ApplicationResultMapper.toResult;
 
 public final class ManageCustomersService implements ManageCustomersUseCase {
     private final CustomerRepositoryPort customers;
@@ -20,30 +24,30 @@ public final class ManageCustomersService implements ManageCustomersUseCase {
     }
 
     @Override
-    public Customer create(Command command) {
+    public CustomerResult create(Command command) {
         return transactions.required(() -> {
             String document = DocumentValidator.onlyDigits(command.documentNumber());
             if (customers.existsByDocumentNumber(document)) {
                 throw new ConflictException("Já existe cliente cadastrado com esse CPF/CNPJ.");
             }
-            return customers.save(new Customer(
+            return toResult(customers.save(new Customer(
                 command.fullName(), command.documentType(), document, command.email(), command.phone()
-            ));
+            )));
         });
     }
 
     @Override
-    public List<Customer> list() {
-        return transactions.required(customers::findAll);
+    public List<CustomerResult> list() {
+        return transactions.required(() -> customers.findAll().stream().map(ApplicationResultMapper::toResult).toList());
     }
 
     @Override
-    public Customer get(UUID id) {
-        return transactions.required(() -> find(id));
+    public CustomerResult get(UUID id) {
+        return transactions.required(() -> toResult(find(id)));
     }
 
     @Override
-    public Customer update(UUID id, Command command) {
+    public CustomerResult update(UUID id, Command command) {
         return transactions.required(() -> {
             var customer = find(id);
             String document = DocumentValidator.onlyDigits(command.documentNumber());
@@ -53,7 +57,7 @@ public final class ManageCustomersService implements ManageCustomersUseCase {
                     throw new ConflictException("Já existe outro cliente cadastrado com esse CPF/CNPJ.");
                 });
             customer.update(command.fullName(), command.documentType(), document, command.email(), command.phone());
-            return customers.save(customer);
+            return toResult(customers.save(customer));
         });
     }
 

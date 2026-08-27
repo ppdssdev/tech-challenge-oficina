@@ -1,10 +1,10 @@
-package br.com.fiap.techchallenge.oficina.adapters.in.web.dto.catalog;
+package br.com.fiap.techchallenge.oficina.application.port.in.result;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-public record PartResponse(
+public record PartResult(
     UUID id,
     String name,
     String sku,

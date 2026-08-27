@@ -1,6 +1,5 @@
 package br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder;
 
-import br.com.fiap.techchallenge.oficina.application.port.in.AddWorkOrderItemsUseCase;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
@@ -8,5 +7,5 @@ import java.util.UUID;
 public record RequestedPartInput(
     @NotNull UUID partId,
     @Min(1) int quantity
-) implements AddWorkOrderItemsUseCase.PartItem {
+) {
 }

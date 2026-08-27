@@ -1,9 +1,10 @@
 package br.com.fiap.techchallenge.oficina.application.usecase;
 
 import br.com.fiap.techchallenge.oficina.application.port.in.ListWorkOrdersUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.WorkOrderSummaryResult;
 import br.com.fiap.techchallenge.oficina.application.port.out.TransactionPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.WorkOrderRepositoryPort;
-import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
+import br.com.fiap.techchallenge.oficina.application.usecase.mapper.ApplicationResultMapper;
 import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrderStatus;
 import java.util.List;
 
@@ -18,9 +19,10 @@ public final class ListWorkOrdersService implements ListWorkOrdersUseCase {
     }
 
     @Override
-    public List<WorkOrder> list(StatusFilter status) {
-        return transactions.required(() -> status == null
+    public List<WorkOrderSummaryResult> list(StatusFilter status) {
+        return transactions.required(() -> (status == null
             ? workOrders.findAll()
-            : workOrders.findByStatus(WorkOrderStatus.valueOf(status.name())));
+            : workOrders.findByStatus(WorkOrderStatus.valueOf(status.name())))
+            .stream().map(ApplicationResultMapper::toSummaryResult).toList());
     }
 }

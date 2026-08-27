@@ -1,10 +1,10 @@
 package br.com.fiap.techchallenge.oficina.application.port.in;
 
-import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.WorkOrderSummaryResult;
 import java.util.List;
 
 public interface ListWorkOrdersUseCase {
-    List<WorkOrder> list(StatusFilter status);
+    List<WorkOrderSummaryResult> list(StatusFilter status);
 
     enum StatusFilter {
         RECEIVED,

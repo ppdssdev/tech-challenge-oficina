@@ -14,7 +14,7 @@ concentrava todos os fluxos de ordem de serviço em uma única classe.
 Adotar arquitetura hexagonal dentro do mesmo monólito:
 
 - `domain` contém entidades, objetos de valor, regras e serviços puros;
-- `application/port/in` publica os casos de uso e seus comandos;
+- `application/port/in` publica os casos de uso, seus comandos e resultados;
 - `application/port/out` abstrai persistência, transação, segurança e notificação;
 - `application/usecase` implementa os fluxos sem dependências de framework;
 - `adapters/in/web` mantém URLs, payloads, validação e respostas HTTP;
@@ -24,8 +24,12 @@ Adotar arquitetura hexagonal dentro do mesmo monólito:
 
 As ordens de serviço foram separadas em criar, consultar, listar, iniciar e atualizar
 diagnóstico, adicionar itens, decidir orçamento, finalizar, entregar e calcular
-métricas. Mapeadores explícitos separam domínio, JPA e DTOs. O lock pessimista da OS e
-das peças é mantido durante a mesma transação, com peças bloqueadas em ordem estável.
+métricas. As portas de entrada retornam resultados imutáveis da aplicação, sem expor
+entidades de domínio. DTOs HTTP não implementam comandos: o adaptador web converte
+explicitamente DTO → command e result → DTO. Um mapper da aplicação converte domínio
+→ result, enquanto os mapeadores dos adapters continuam responsáveis por persistência
+e HTTP. O lock pessimista da OS e das peças é mantido durante a mesma transação, com
+peças bloqueadas em ordem estável.
 
 ## Consequências
 

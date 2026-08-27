@@ -1,14 +1,16 @@
 package br.com.fiap.techchallenge.oficina.application.usecase;
 
 import br.com.fiap.techchallenge.oficina.application.port.in.AddWorkOrderItemsUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.WorkOrderResult;
 import br.com.fiap.techchallenge.oficina.application.port.out.PartRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.ServiceCatalogRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.TransactionPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.WorkOrderRepositoryPort;
 import br.com.fiap.techchallenge.oficina.domain.exception.BusinessException;
 import br.com.fiap.techchallenge.oficina.domain.exception.NotFoundException;
-import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
 import java.util.UUID;
+
+import static br.com.fiap.techchallenge.oficina.application.usecase.mapper.ApplicationResultMapper.toResult;
 
 public final class AddWorkOrderItemsService implements AddWorkOrderItemsUseCase {
     private final WorkOrderRepositoryPort workOrders;
@@ -29,7 +31,7 @@ public final class AddWorkOrderItemsService implements AddWorkOrderItemsUseCase 
     }
 
     @Override
-    public WorkOrder add(UUID id, Command command) {
+    public WorkOrderResult add(UUID id, Command command) {
         return transactions.required(() -> {
             var order = workOrders.findDetailedById(id)
                 .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
@@ -52,7 +54,7 @@ public final class AddWorkOrderItemsService implements AddWorkOrderItemsUseCase 
                     input.quantity()
                 ));
             }
-            return workOrders.save(order);
+            return toResult(workOrders.save(order));
         });
     }
 }

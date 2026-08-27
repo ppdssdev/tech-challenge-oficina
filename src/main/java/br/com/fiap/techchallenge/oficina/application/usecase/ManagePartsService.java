@@ -1,13 +1,17 @@
 package br.com.fiap.techchallenge.oficina.application.usecase;
 
 import br.com.fiap.techchallenge.oficina.application.port.in.ManagePartsUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.PartResult;
 import br.com.fiap.techchallenge.oficina.application.port.out.PartRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.TransactionPort;
+import br.com.fiap.techchallenge.oficina.application.usecase.mapper.ApplicationResultMapper;
 import br.com.fiap.techchallenge.oficina.domain.exception.ConflictException;
 import br.com.fiap.techchallenge.oficina.domain.exception.NotFoundException;
 import br.com.fiap.techchallenge.oficina.domain.model.catalog.Part;
 import java.util.List;
 import java.util.UUID;
+
+import static br.com.fiap.techchallenge.oficina.application.usecase.mapper.ApplicationResultMapper.toResult;
 
 public final class ManagePartsService implements ManagePartsUseCase {
     private final PartRepositoryPort parts;
@@ -19,7 +23,7 @@ public final class ManagePartsService implements ManagePartsUseCase {
     }
 
     @Override
-    public Part create(Command command) {
+    public PartResult create(Command command) {
         return transactions.required(() -> {
             String sku = normalizeSku(command.sku());
             if (parts.existsBySku(sku)) {
@@ -27,27 +31,29 @@ public final class ManagePartsService implements ManagePartsUseCase {
             }
             var part = new Part(command.name(), sku, command.unitPrice(), command.quantityInStock(), command.minimumStock());
             part.update(command.name(), sku, command.unitPrice(), command.quantityInStock(), command.minimumStock(), command.active());
-            return parts.save(part);
+            return toResult(parts.save(part));
         });
     }
 
     @Override
-    public List<Part> list(boolean activeOnly) {
-        return transactions.required(() -> activeOnly ? parts.findActive() : parts.findAll());
+    public List<PartResult> list(boolean activeOnly) {
+        return transactions.required(() -> (activeOnly ? parts.findActive() : parts.findAll())
+            .stream().map(ApplicationResultMapper::toResult).toList());
     }
 
     @Override
-    public List<Part> belowMinimumStock() {
-        return transactions.required(() -> parts.findAll().stream().filter(Part::isBelowMinimumStock).toList());
+    public List<PartResult> belowMinimumStock() {
+        return transactions.required(() -> parts.findAll().stream()
+            .filter(Part::isBelowMinimumStock).map(ApplicationResultMapper::toResult).toList());
     }
 
     @Override
-    public Part get(UUID id) {
-        return transactions.required(() -> find(id));
+    public PartResult get(UUID id) {
+        return transactions.required(() -> toResult(find(id)));
     }
 
     @Override
-    public Part update(UUID id, Command command) {
+    public PartResult update(UUID id, Command command) {
         return transactions.required(() -> {
             var part = find(id);
             String sku = normalizeSku(command.sku());
@@ -55,25 +61,25 @@ public final class ManagePartsService implements ManagePartsUseCase {
                 throw new ConflictException("Já existe outra peça/insumo com esse SKU.");
             });
             part.update(command.name(), sku, command.unitPrice(), command.quantityInStock(), command.minimumStock(), command.active());
-            return parts.save(part);
+            return toResult(parts.save(part));
         });
     }
 
     @Override
-    public Part increaseStock(UUID id, int quantity) {
+    public PartResult increaseStock(UUID id, int quantity) {
         return transactions.required(() -> {
             var part = findLocked(id);
             part.increaseStock(quantity);
-            return parts.save(part);
+            return toResult(parts.save(part));
         });
     }
 
     @Override
-    public Part decreaseStock(UUID id, int quantity) {
+    public PartResult decreaseStock(UUID id, int quantity) {
         return transactions.required(() -> {
             var part = findLocked(id);
             part.decreaseStock(quantity);
-            return parts.save(part);
+            return toResult(parts.save(part));
         });
     }
 

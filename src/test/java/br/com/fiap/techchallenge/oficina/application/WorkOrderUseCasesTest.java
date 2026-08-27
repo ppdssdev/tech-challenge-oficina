@@ -1,6 +1,6 @@
 package br.com.fiap.techchallenge.oficina.application;
 
-import br.com.fiap.techchallenge.oficina.application.port.in.AddWorkOrderItemsUseCase.DefaultCommand;
+import br.com.fiap.techchallenge.oficina.application.port.in.AddWorkOrderItemsUseCase.Command;
 import br.com.fiap.techchallenge.oficina.application.port.out.PartRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.ServiceCatalogRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.TransactionPort;
@@ -64,7 +64,7 @@ class WorkOrderUseCasesTest {
             workOrderRepository, serviceCatalogRepository, partRepository, transactions
         );
 
-        assertThatThrownBy(() -> useCase.add(id, new DefaultCommand(List.of(), List.of())))
+        assertThatThrownBy(() -> useCase.add(id, new Command(List.of(), List.of())))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining("Informe ao menos um serviço ou peça");
     }

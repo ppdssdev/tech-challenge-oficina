@@ -1,10 +1,10 @@
-package br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder;
+package br.com.fiap.techchallenge.oficina.application.port.in.result;
 
 import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrderStatus;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
-public record PublicWorkOrderStatusResponse(
+public record PublicWorkOrderStatusResult(
     String code,
     WorkOrderStatus status,
     String statusLabel,

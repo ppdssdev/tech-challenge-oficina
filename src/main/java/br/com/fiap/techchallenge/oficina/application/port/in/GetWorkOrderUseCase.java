@@ -1,9 +1,10 @@
 package br.com.fiap.techchallenge.oficina.application.port.in;
 
-import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.PublicWorkOrderStatusResult;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.WorkOrderResult;
 import java.util.UUID;
 
 public interface GetWorkOrderUseCase {
-    WorkOrder get(UUID id);
-    WorkOrder getPublicStatus(String code, String documentNumber);
+    WorkOrderResult get(UUID id);
+    PublicWorkOrderStatusResult getPublicStatus(String code, String documentNumber);
 }

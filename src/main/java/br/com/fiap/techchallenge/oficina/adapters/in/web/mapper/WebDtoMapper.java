@@ -8,6 +8,7 @@ import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.customer.CustomerRe
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.customer.CustomerResponse;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.vehicle.VehicleRequest;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.vehicle.VehicleResponse;
+import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.AddWorkOrderItemsRequest;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.AverageExecutionTimeResponse;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.CreateWorkOrderRequest;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.PublicWorkOrderStatusResponse;
@@ -15,17 +16,21 @@ import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.WorkOrder
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.WorkOrderResponse;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.WorkOrderServiceItemResponse;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.WorkOrderSummaryResponse;
+import br.com.fiap.techchallenge.oficina.application.port.in.AddWorkOrderItemsUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.CalculateWorkOrderMetricsUseCase.ExecutionTimeMetrics;
 import br.com.fiap.techchallenge.oficina.application.port.in.CreateWorkOrderUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageCustomersUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManagePartsUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageServiceCatalogUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageVehiclesUseCase;
-import br.com.fiap.techchallenge.oficina.domain.model.catalog.Part;
-import br.com.fiap.techchallenge.oficina.domain.model.catalog.ServiceCatalogItem;
-import br.com.fiap.techchallenge.oficina.domain.model.customer.Customer;
-import br.com.fiap.techchallenge.oficina.domain.model.vehicle.Vehicle;
-import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.CustomerResult;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.PartResult;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.PublicWorkOrderStatusResult;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.ServiceCatalogResult;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.VehicleResult;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.WorkOrderResult;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.WorkOrderSummaryResult;
+import java.util.List;
 
 public final class WebDtoMapper {
     private WebDtoMapper() { }
@@ -36,10 +41,10 @@ public final class WebDtoMapper {
         );
     }
 
-    public static CustomerResponse toResponse(Customer customer) {
+    public static CustomerResponse toResponse(CustomerResult customer) {
         return new CustomerResponse(
-            customer.getId(), customer.getFullName(), customer.getDocumentType(), customer.getDocumentNumber(),
-            customer.getEmail(), customer.getPhone(), customer.getCreatedAt(), customer.getUpdatedAt()
+            customer.id(), customer.fullName(), customer.documentType(), customer.documentNumber(),
+            customer.email(), customer.phone(), customer.createdAt(), customer.updatedAt()
         );
     }
 
@@ -49,10 +54,10 @@ public final class WebDtoMapper {
         );
     }
 
-    public static PartResponse toResponse(Part part) {
+    public static PartResponse toResponse(PartResult part) {
         return new PartResponse(
-            part.getId(), part.getName(), part.getSku(), part.getUnitPrice(), part.getQuantityInStock(),
-            part.getMinimumStock(), part.isBelowMinimumStock(), part.isActive(), part.getCreatedAt(), part.getUpdatedAt()
+            part.id(), part.name(), part.sku(), part.unitPrice(), part.quantityInStock(),
+            part.minimumStock(), part.belowMinimumStock(), part.active(), part.createdAt(), part.updatedAt()
         );
     }
 
@@ -62,10 +67,10 @@ public final class WebDtoMapper {
         );
     }
 
-    public static ServiceCatalogResponse toResponse(ServiceCatalogItem item) {
+    public static ServiceCatalogResponse toResponse(ServiceCatalogResult item) {
         return new ServiceCatalogResponse(
-            item.getId(), item.getName(), item.getDescription(), item.getBasePrice(), item.getEstimatedMinutes(),
-            item.isActive(), item.getCreatedAt(), item.getUpdatedAt()
+            item.id(), item.name(), item.description(), item.basePrice(), item.estimatedMinutes(),
+            item.active(), item.createdAt(), item.updatedAt()
         );
     }
 
@@ -75,11 +80,11 @@ public final class WebDtoMapper {
         );
     }
 
-    public static VehicleResponse toResponse(Vehicle vehicle) {
+    public static VehicleResponse toResponse(VehicleResult vehicle) {
         return new VehicleResponse(
-            vehicle.getId(), vehicle.getCustomer().getId(), vehicle.getCustomer().getFullName(),
-            vehicle.getCustomer().getDocumentNumber(), vehicle.getPlate(), vehicle.getBrand(), vehicle.getModel(),
-            vehicle.getManufacturingYear(), vehicle.getCreatedAt(), vehicle.getUpdatedAt()
+            vehicle.id(), vehicle.customerId(), vehicle.customerName(), vehicle.customerDocumentNumber(),
+            vehicle.plate(), vehicle.brand(), vehicle.model(), vehicle.manufacturingYear(),
+            vehicle.createdAt(), vehicle.updatedAt()
         );
     }
 
@@ -94,47 +99,56 @@ public final class WebDtoMapper {
                 request.vehicle().manufacturingYear()
             ),
             request.services().stream().map(item -> new CreateWorkOrderUseCase.Item(item.serviceId(), item.quantity())).toList(),
-            request.parts() == null ? java.util.List.of() : request.parts().stream()
+            request.parts() == null ? List.of() : request.parts().stream()
                 .map(item -> new CreateWorkOrderUseCase.Item(item.partId(), item.quantity())).toList(),
             request.diagnosticNotes()
         );
     }
 
-    public static WorkOrderResponse toResponse(WorkOrder order) {
+    public static AddWorkOrderItemsUseCase.Command toCommand(AddWorkOrderItemsRequest request) {
+        var services = request.services() == null ? List.<AddWorkOrderItemsUseCase.ServiceItem>of()
+            : request.services().stream()
+                .map(item -> new AddWorkOrderItemsUseCase.ServiceItem(item.serviceId(), item.quantity()))
+                .toList();
+        var parts = request.parts() == null ? List.<AddWorkOrderItemsUseCase.PartItem>of()
+            : request.parts().stream()
+                .map(item -> new AddWorkOrderItemsUseCase.PartItem(item.partId(), item.quantity()))
+                .toList();
+        return new AddWorkOrderItemsUseCase.Command(services, parts);
+    }
+
+    public static WorkOrderResponse toResponse(WorkOrderResult order) {
         return new WorkOrderResponse(
-            order.getId(), order.getCode(), order.getStatus(), order.getStatus().getLabel(),
-            order.getCustomer().getId(), order.getCustomer().getFullName(), order.getCustomer().getDocumentNumber(),
-            order.getVehicle().getId(), order.getVehicle().getPlate(),
-            order.getVehicle().getBrand() + " " + order.getVehicle().getModel() + " " + order.getVehicle().getManufacturingYear(),
-            order.getDiagnosticNotes(), order.getTotalServices(), order.getTotalParts(), order.getTotalAmount(),
-            order.getServiceItems().stream().map(item -> new WorkOrderServiceItemResponse(
-                item.getService().getId(), item.getServiceName(), item.getUnitPrice(), item.getQuantity(),
-                item.getEstimatedMinutes(), item.getLineTotal()
+            order.id(), order.code(), order.status(), order.statusLabel(),
+            order.customerId(), order.customerName(), order.customerDocumentNumber(),
+            order.vehicleId(), order.vehiclePlate(), order.vehicleDescription(),
+            order.diagnosticNotes(), order.totalServices(), order.totalParts(), order.totalAmount(),
+            order.services().stream().map(item -> new WorkOrderServiceItemResponse(
+                item.serviceId(), item.name(), item.unitPrice(), item.quantity(),
+                item.estimatedMinutes(), item.lineTotal()
             )).toList(),
-            order.getPartItems().stream().map(item -> new WorkOrderPartItemResponse(
-                item.getPart().getId(), item.getPartName(), item.getSku(), item.getUnitPrice(), item.getQuantity(),
-                item.getLineTotal(), item.isStockReserved()
+            order.parts().stream().map(item -> new WorkOrderPartItemResponse(
+                item.partId(), item.name(), item.sku(), item.unitPrice(), item.quantity(),
+                item.lineTotal(), item.stockReserved()
             )).toList(),
-            order.getCustomerAuthorizedAt(), order.getStartedAt(), order.getFinishedAt(), order.getDeliveredAt(),
-            order.getCreatedAt(), order.getUpdatedAt()
+            order.customerAuthorizedAt(), order.startedAt(), order.finishedAt(), order.deliveredAt(),
+            order.createdAt(), order.updatedAt()
         );
     }
 
-    public static WorkOrderSummaryResponse toSummaryResponse(WorkOrder order) {
+    public static WorkOrderSummaryResponse toSummaryResponse(WorkOrderSummaryResult order) {
         return new WorkOrderSummaryResponse(
-            order.getId(), order.getCode(), order.getStatus(), order.getStatus().getLabel(),
-            order.getCustomer().getFullName(), order.getCustomer().getDocumentNumber(), order.getVehicle().getPlate(),
-            order.getVehicle().getBrand() + " " + order.getVehicle().getModel(), order.getTotalAmount(),
-            order.getCreatedAt(), order.getUpdatedAt()
+            order.id(), order.code(), order.status(), order.statusLabel(),
+            order.customerName(), order.customerDocumentNumber(), order.vehiclePlate(),
+            order.vehicleDescription(), order.totalAmount(), order.createdAt(), order.updatedAt()
         );
     }
 
-    public static PublicWorkOrderStatusResponse toPublicResponse(WorkOrder order) {
+    public static PublicWorkOrderStatusResponse toPublicResponse(PublicWorkOrderStatusResult order) {
         return new PublicWorkOrderStatusResponse(
-            order.getCode(), order.getStatus(), order.getStatus().getLabel(), order.getCustomer().getFullName(),
-            order.getVehicle().getPlate(), order.getVehicle().getBrand() + " " + order.getVehicle().getModel(),
-            order.getDiagnosticNotes(), order.getTotalAmount(), order.getCustomerAuthorizedAt(), order.getStartedAt(),
-            order.getFinishedAt(), order.getDeliveredAt(), order.getUpdatedAt()
+            order.code(), order.status(), order.statusLabel(), order.customerName(),
+            order.vehiclePlate(), order.vehicleDescription(), order.diagnosticNotes(), order.totalAmount(),
+            order.customerAuthorizedAt(), order.startedAt(), order.finishedAt(), order.deliveredAt(), order.updatedAt()
         );
     }
 

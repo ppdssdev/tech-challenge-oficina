@@ -1,6 +1,7 @@
 package br.com.fiap.techchallenge.oficina.application.usecase;
 
 import br.com.fiap.techchallenge.oficina.application.port.in.CreateWorkOrderUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.WorkOrderResult;
 import br.com.fiap.techchallenge.oficina.application.port.out.CustomerRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.PartRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.ServiceCatalogRepositoryPort;
@@ -15,6 +16,8 @@ import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
 import br.com.fiap.techchallenge.oficina.domain.service.DocumentValidator;
 import br.com.fiap.techchallenge.oficina.domain.service.VehiclePlateValidator;
 import br.com.fiap.techchallenge.oficina.domain.service.WorkOrderCodeGenerator;
+
+import static br.com.fiap.techchallenge.oficina.application.usecase.mapper.ApplicationResultMapper.toResult;
 
 public final class CreateWorkOrderService implements CreateWorkOrderUseCase {
 
@@ -42,7 +45,7 @@ public final class CreateWorkOrderService implements CreateWorkOrderUseCase {
     }
 
     @Override
-    public WorkOrder create(Command command) {
+    public WorkOrderResult create(Command command) {
         return transactions.required(() -> {
             var customer = resolveCustomer(command.customer());
             var vehicle = resolveVehicle(customer, command.vehicle());
@@ -58,7 +61,7 @@ public final class CreateWorkOrderService implements CreateWorkOrderUseCase {
                     .orElseThrow(() -> new NotFoundException("Peça/insumo informado na OS não encontrado.")),
                 input.quantity()
             ));
-            return workOrders.save(order);
+            return toResult(workOrders.save(order));
         });
     }
 

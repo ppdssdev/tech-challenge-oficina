@@ -99,7 +99,7 @@ public class WorkOrderController {
     @PostMapping("/{id}/items")
     @Operation(summary = "Inclui serviços, peças ou insumos adicionais e envia orçamento para aprovação")
     public WorkOrderResponse addItems(@PathVariable UUID id, @Valid @RequestBody AddWorkOrderItemsRequest request) {
-        return WebDtoMapper.toResponse(addItems.add(id, request));
+        return WebDtoMapper.toResponse(addItems.add(id, WebDtoMapper.toCommand(request)));
     }
 
     @PostMapping("/{id}/approve")

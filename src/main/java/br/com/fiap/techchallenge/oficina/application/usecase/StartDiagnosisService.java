@@ -1,11 +1,14 @@
 package br.com.fiap.techchallenge.oficina.application.usecase;
 
 import br.com.fiap.techchallenge.oficina.application.port.in.StartDiagnosisUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.WorkOrderResult;
 import br.com.fiap.techchallenge.oficina.application.port.out.TransactionPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.WorkOrderRepositoryPort;
 import br.com.fiap.techchallenge.oficina.domain.exception.NotFoundException;
 import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
 import java.util.UUID;
+
+import static br.com.fiap.techchallenge.oficina.application.usecase.mapper.ApplicationResultMapper.toResult;
 
 public final class StartDiagnosisService implements StartDiagnosisUseCase {
     private final WorkOrderRepositoryPort workOrders;
@@ -17,11 +20,11 @@ public final class StartDiagnosisService implements StartDiagnosisUseCase {
     }
 
     @Override
-    public WorkOrder start(UUID id, String notes) {
+    public WorkOrderResult start(UUID id, String notes) {
         return transactions.required(() -> {
             var order = find(id);
             order.startDiagnosis(notes);
-            return workOrders.save(order);
+            return toResult(workOrders.save(order));
         });
     }
 

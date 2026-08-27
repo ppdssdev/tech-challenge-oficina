@@ -1,8 +1,8 @@
 package br.com.fiap.techchallenge.oficina.application.port.in;
 
-import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.WorkOrderResult;
 import java.util.UUID;
 
 public interface DeliverWorkOrderUseCase {
-    WorkOrder deliver(UUID id);
+    WorkOrderResult deliver(UUID id);
 }
