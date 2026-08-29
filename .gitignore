@@ -1,6 +1,6 @@
 # Build outputs
 target/
-out/
+/out/
 build/
 
 # Maven

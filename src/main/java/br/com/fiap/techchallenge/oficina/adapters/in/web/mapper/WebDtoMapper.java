@@ -99,8 +99,10 @@ public final class WebDtoMapper {
                 request.vehicle().manufacturingYear()
             ),
             request.services().stream().map(item -> new CreateWorkOrderUseCase.Item(item.serviceId(), item.quantity())).toList(),
+
             request.parts() == null ? List.of() : request.parts().stream()
                 .map(item -> new CreateWorkOrderUseCase.Item(item.partId(), item.quantity())).toList(),
+
             request.diagnosticNotes()
         );
     }
