@@ -11,22 +11,17 @@ import java.util.UUID;
 public class WorkOrderPartItem extends BaseEntity {
 
     private final Part part;
-    private String partName;
-    private String sku;
-    private BigDecimal unitPrice;
+    private final String partName;
+    private final String sku;
+    private final BigDecimal unitPrice;
     private final int quantity;
-    private BigDecimal lineTotal;
+    private final BigDecimal lineTotal;
     private boolean stockReserved;
 
     public WorkOrderPartItem(WorkOrder workOrder, Part part, int quantity) {
-        if (workOrder == null || part == null) {
-            throw new BusinessException("Ordem de serviço e peça são obrigatórias.");
-        }
+        validateStructure(workOrder, part, quantity);
         if (!part.isActive()) {
             throw new BusinessException("Peça inativa não pode ser incluída na OS.");
-        }
-        if (quantity <= 0) {
-            throw new BusinessException("Quantidade da peça deve ser maior que zero.");
         }
         if (part.getQuantityInStock() < quantity) {
             throw new BusinessException("Estoque insuficiente para a peça " + part.getSku() + ".");
@@ -41,19 +36,49 @@ public class WorkOrderPartItem extends BaseEntity {
         this.stockReserved = false;
     }
 
+    private WorkOrderPartItem(
+        WorkOrder workOrder,
+        Part part,
+        String partName,
+        String sku,
+        BigDecimal unitPrice,
+        int quantity,
+        BigDecimal lineTotal,
+        boolean stockReserved
+    ) {
+        validateStructure(workOrder, part, quantity);
+        if (unitPrice == null || lineTotal == null) {
+            throw new BusinessException("Preço unitário e total da peça são obrigatórios.");
+        }
+
+        this.part = part;
+        this.partName = partName;
+        this.sku = sku;
+        this.unitPrice = unitPrice;
+        this.quantity = quantity;
+        this.lineTotal = lineTotal;
+        this.stockReserved = stockReserved;
+    }
+
     static WorkOrderPartItem restore(
         UUID id, WorkOrder workOrder, Part part, String partName, String sku,
         BigDecimal unitPrice, int quantity, BigDecimal lineTotal, boolean stockReserved,
         OffsetDateTime createdAt, OffsetDateTime updatedAt
     ) {
-        var item = new WorkOrderPartItem(workOrder, part, quantity);
-        item.partName = partName;
-        item.sku = sku;
-        item.unitPrice = unitPrice;
-        item.lineTotal = lineTotal;
-        item.stockReserved = stockReserved;
+        var item = new WorkOrderPartItem(
+            workOrder, part, partName, sku, unitPrice, quantity, lineTotal, stockReserved
+        );
         item.restoreMetadata(id, createdAt, updatedAt);
         return item;
+    }
+
+    private static void validateStructure(WorkOrder workOrder, Part part, int quantity) {
+        if (workOrder == null || part == null) {
+            throw new BusinessException("Ordem de serviço e peça são obrigatórias.");
+        }
+        if (quantity <= 0) {
+            throw new BusinessException("Quantidade da peça deve ser maior que zero.");
+        }
     }
 
     public void reserveStock() {

@@ -7,8 +7,12 @@ import br.com.fiap.techchallenge.oficina.domain.model.customer.Customer;
 import br.com.fiap.techchallenge.oficina.domain.model.customer.DocumentType;
 import br.com.fiap.techchallenge.oficina.domain.model.vehicle.Vehicle;
 import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
+import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrderPartItem;
+import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrderServiceItem;
 import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrderStatus;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -144,6 +148,78 @@ class WorkOrderDomainTest {
         assertThatThrownBy(() -> order.addRequestedService(service, 1))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining("finalizada ou entregue");
+    }
+
+    @Test
+    void shouldRehydrateReservedPartItemWhenCurrentStockIsZero() {
+        var source = sampleOrder();
+        var part = new Part("Filtro atual", "FILTER-001", BigDecimal.valueOf(40), 0, 1);
+        var snapshot = new WorkOrder.PartItemSnapshot(
+            UUID.randomUUID(), part, "Filtro contratado", "FILTER-001", new BigDecimal("35.00"),
+            2, new BigDecimal("70.00"), true, null, null
+        );
+
+        var restored = WorkOrder.restore(
+            UUID.randomUUID(), "OS-HIST-001", source.getCustomer(), source.getVehicle(),
+            WorkOrderStatus.IN_EXECUTION, "Diagnóstico histórico", null, null, null, null,
+            new BigDecimal("0.00"), new BigDecimal("70.00"), new BigDecimal("70.00"),
+            List.of(), List.of(snapshot), null, null
+        );
+
+        var restoredItem = restored.getPartItems().getFirst();
+        assertThat(restoredItem.getPartName()).isEqualTo("Filtro contratado");
+        assertThat(restoredItem.getUnitPrice()).isEqualByComparingTo("35.00");
+        assertThat(restoredItem.getLineTotal()).isEqualByComparingTo("70.00");
+        assertThat(restoredItem.isStockReserved()).isTrue();
+        assertThat(part.getQuantityInStock()).isZero();
+    }
+
+    @Test
+    void shouldRehydrateHistoricalItemWithInactiveService() {
+        var source = sampleOrder();
+        var service = new ServiceCatalogItem(
+            "Serviço atual", "Descrição atual", BigDecimal.valueOf(150), 60
+        );
+        service.deactivate();
+        var snapshot = new WorkOrder.ServiceItemSnapshot(
+            UUID.randomUUID(), service, "Serviço contratado", new BigDecimal("120.00"),
+            2, 80, new BigDecimal("240.00"), null, null
+        );
+
+        var restored = WorkOrder.restore(
+            UUID.randomUUID(), "OS-HIST-002", source.getCustomer(), source.getVehicle(),
+            WorkOrderStatus.IN_EXECUTION, "Diagnóstico histórico", null, null, null, null,
+            new BigDecimal("240.00"), new BigDecimal("0.00"), new BigDecimal("240.00"),
+            List.of(snapshot), List.of(), null, null
+        );
+
+        var restoredItem = restored.getServiceItems().getFirst();
+        assertThat(service.isActive()).isFalse();
+        assertThat(restoredItem.getServiceName()).isEqualTo("Serviço contratado");
+        assertThat(restoredItem.getUnitPrice()).isEqualByComparingTo("120.00");
+        assertThat(restoredItem.getEstimatedMinutes()).isEqualTo(80);
+        assertThat(restoredItem.getLineTotal()).isEqualByComparingTo("240.00");
+    }
+
+    @Test
+    void shouldStillRejectNewPartItemWhenStockIsInsufficient() {
+        var order = sampleOrder();
+        var part = new Part("Filtro", "FILTER-001", BigDecimal.valueOf(35), 1, 1);
+
+        assertThatThrownBy(() -> new WorkOrderPartItem(order, part, 2))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining("Estoque insuficiente");
+    }
+
+    @Test
+    void shouldStillRejectNewServiceItemWhenServiceIsInactive() {
+        var order = sampleOrder();
+        var service = new ServiceCatalogItem("Alinhamento", "Direção", BigDecimal.valueOf(150), 60);
+        service.deactivate();
+
+        assertThatThrownBy(() -> new WorkOrderServiceItem(order, service, 1))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining("Serviço inativo");
     }
 
     private WorkOrder sampleOrder() {

@@ -102,6 +102,40 @@ class WorkOrderFlowIntegrationTest {
         assertThat(publicStatus.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    @Test
+    void shouldReadApprovedWorkOrderAfterConsumingAllPartStock() {
+        String token = login();
+        HttpHeaders adminHeaders = adminHeaders(token);
+        UUID serviceId = createService(adminHeaders);
+        UUID partId = createPart(adminHeaders, 2);
+        ResponseEntity<Map<String, Object>> created = createOrder(adminHeaders, serviceId, partId);
+        String orderId = requiredValue(created, "id").toString();
+
+        ResponseEntity<Map<String, Object>> approved = postWithoutBody(
+            "/api/v1/admin/work-orders/" + orderId + "/approve", adminHeaders
+        );
+
+        assertThat(approved.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(requiredValue(approved, "status")).isEqualTo("IN_EXECUTION");
+
+        ResponseEntity<Map<String, Object>> detail = restTemplate.exchange(
+            url("/api/v1/admin/work-orders/" + orderId),
+            HttpMethod.GET,
+            new HttpEntity<>(adminHeaders),
+            JSON_OBJECT
+        );
+        ResponseEntity<Map<String, Object>> part = restTemplate.exchange(
+            url("/api/v1/admin/parts/" + partId),
+            HttpMethod.GET,
+            new HttpEntity<>(adminHeaders),
+            JSON_OBJECT
+        );
+
+        assertThat(detail.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(requiredValue(detail, "status")).isEqualTo("IN_EXECUTION");
+        assertThat(requiredValue(part, "quantityInStock")).isEqualTo(0);
+    }
+
     private String login() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -158,6 +192,10 @@ class WorkOrderFlowIntegrationTest {
     }
 
     private UUID createPart(HttpHeaders headers) {
+        return createPart(headers, 10);
+    }
+
+    private UUID createPart(HttpHeaders headers, int quantityInStock) {
         ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
             url("/api/v1/admin/parts"),
             HttpMethod.POST,
@@ -165,7 +203,7 @@ class WorkOrderFlowIntegrationTest {
                 "name", "Filtro de óleo",
                 "sku", "FILTER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(),
                 "unitPrice", 35.00,
-                "quantityInStock", 10,
+                "quantityInStock", quantityInStock,
                 "minimumStock", 2,
                 "active", true
             ), headers),
