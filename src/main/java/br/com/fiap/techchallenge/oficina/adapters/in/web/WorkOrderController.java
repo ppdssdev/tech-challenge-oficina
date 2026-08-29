@@ -1,6 +1,7 @@
 package br.com.fiap.techchallenge.oficina.adapters.in.web;
 
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.AddWorkOrderItemsRequest;
+import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.BudgetNotificationResponse;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.CreateWorkOrderRequest;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.DiagnosticRequest;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.WorkOrderResponse;
@@ -13,6 +14,7 @@ import br.com.fiap.techchallenge.oficina.application.port.in.DeliverWorkOrderUse
 import br.com.fiap.techchallenge.oficina.application.port.in.FinishWorkOrderUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.GetWorkOrderUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ListWorkOrdersUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.NotifyBudgetUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.StartDiagnosisUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.UpdateDiagnosisUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,6 +42,7 @@ public class WorkOrderController {
     private final UpdateDiagnosisUseCase updateDiagnosis;
     private final AddWorkOrderItemsUseCase addItems;
     private final DecideBudgetUseCase decideBudget;
+    private final NotifyBudgetUseCase notifyBudget;
     private final FinishWorkOrderUseCase finishWorkOrder;
     private final DeliverWorkOrderUseCase deliverWorkOrder;
 
@@ -51,6 +54,7 @@ public class WorkOrderController {
         UpdateDiagnosisUseCase updateDiagnosis,
         AddWorkOrderItemsUseCase addItems,
         DecideBudgetUseCase decideBudget,
+        NotifyBudgetUseCase notifyBudget,
         FinishWorkOrderUseCase finishWorkOrder,
         DeliverWorkOrderUseCase deliverWorkOrder
     ) {
@@ -61,6 +65,7 @@ public class WorkOrderController {
         this.updateDiagnosis = updateDiagnosis;
         this.addItems = addItems;
         this.decideBudget = decideBudget;
+        this.notifyBudget = notifyBudget;
         this.finishWorkOrder = finishWorkOrder;
         this.deliverWorkOrder = deliverWorkOrder;
     }
@@ -106,6 +111,12 @@ public class WorkOrderController {
     @Operation(summary = "Aprova orçamento, baixa estoque pendente e move OS para execução")
     public WorkOrderResponse approveBudget(@PathVariable UUID id) {
         return WebDtoMapper.toResponse(decideBudget.approve(id));
+    }
+
+    @PostMapping("/{id}/budget/notify")
+    @Operation(summary = "Gera prévia local da notificação do orçamento aguardando aprovação")
+    public BudgetNotificationResponse notifyBudget(@PathVariable UUID id) {
+        return WebDtoMapper.toResponse(notifyBudget.notifyBudget(id));
     }
 
     @PostMapping("/{id}/finish")

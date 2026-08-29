@@ -49,6 +49,7 @@ A escolha é coerente com o domínio porque o sistema precisa de:
 - Inclusão de peças e insumos necessários.
 - Orçamento calculado automaticamente.
 - Status automático para `WAITING_APPROVAL` quando existe orçamento.
+- Prévia local de notificação do orçamento por e-mail simulado, sem provedor externo.
 - Aprovação ou recusa externa do orçamento pelo cliente.
 - Baixa de estoque das peças somente no momento da aprovação.
 - Finalização da OS.
@@ -267,10 +268,13 @@ Copie da resposta:
 Depois execute, nesta ordem:
 
 ```http
+POST /api/v1/admin/work-orders/{id}/budget/notify
 POST /api/v1/admin/work-orders/{id}/approve
 POST /api/v1/admin/work-orders/{id}/finish
 POST /api/v1/admin/work-orders/{id}/deliver
 ```
+
+O endpoint de notificação é opcional e não altera o status. Ele retorna a prévia do e-mail simulado com os links públicos para o cliente decidir o orçamento. O endpoint administrativo de aprovação continua disponível para o atendente.
 
 O endpoint `POST /api/v1/admin/work-orders/{id}/diagnosis/start` é usado para OS em `RECEIVED`. No fluxo acima, a OS já vai para `WAITING_APPROVAL`; se chamar diagnóstico nesse estado, a API retorna `422 Unprocessable Entity`, porque viola a transição permitida do domínio.
 
@@ -400,6 +404,12 @@ Esses valores podem ser alterados por variáveis de ambiente:
 ```text
 APP_ADMIN_DEFAULT_USERNAME
 APP_ADMIN_DEFAULT_PASSWORD
+```
+
+A URL base usada nos links da notificação simulada é `http://localhost:8080` por padrão e pode ser alterada por:
+
+```text
+APP_PUBLIC_BASE_URL
 ```
 
 ---
@@ -546,6 +556,7 @@ GET  /api/v1/admin/work-orders/{id}
 POST /api/v1/admin/work-orders/{id}/diagnosis/start
 POST /api/v1/admin/work-orders/{id}/diagnosis/notes
 POST /api/v1/admin/work-orders/{id}/items
+POST /api/v1/admin/work-orders/{id}/budget/notify
 POST /api/v1/admin/work-orders/{id}/approve
 POST /api/v1/admin/work-orders/{id}/finish
 POST /api/v1/admin/work-orders/{id}/deliver
@@ -562,6 +573,30 @@ POST /api/v1/public/work-orders/{code}/budget/reject
 ```
 
 A aprovação move a OS para `IN_EXECUTION`; a recusa move o orçamento inicial para `BUDGET_REJECTED`. Os status `FINALIZED` e `DELIVERED` continuam reservados, respectivamente, à finalização técnica e à entrega do veículo.
+
+### Notificação simulada do orçamento
+
+O projeto não utiliza serviço pago, SMTP ou provedor externo de e-mail. Enquanto a OS estiver em `WAITING_APPROVAL`, o endpoint administrativo abaixo gera uma prévia local e registra a mensagem no log:
+
+```http
+POST /api/v1/admin/work-orders/{id}/budget/notify
+```
+
+A resposta contém destinatário, assunto, corpo e os links `approveUrl` e `rejectUrl`. O cliente ainda precisa enviar seu CPF ou CNPJ no body ao chamar um desses endpoints `POST`. A notificação não altera o status da OS. Uma integração local real via Mailpit poderá substituir o adapter simulado posteriormente, preservando a mesma porta de saída.
+
+Exemplo de resposta:
+
+```json
+{
+  "workOrderCode": "OS-20260829-ABC123",
+  "channel": "SIMULATED_EMAIL",
+  "recipient": "cliente@email.com",
+  "subject": "Orçamento da OS OS-20260829-ABC123 aguardando aprovação",
+  "body": "Olá, Maria Silva. O orçamento está aguardando decisão...",
+  "approveUrl": "http://localhost:8080/api/v1/public/work-orders/OS-20260829-ABC123/budget/approve",
+  "rejectUrl": "http://localhost:8080/api/v1/public/work-orders/OS-20260829-ABC123/budget/reject"
+}
+```
 
 ### Métricas
 
@@ -646,28 +681,37 @@ curl -X POST http://localhost:8080/api/v1/admin/work-orders \
 
 A resposta retorna o `id` e o `code` da OS.
 
-### 3. Aprovar orçamento
+### 3. Gerar notificação simulada do orçamento
+
+```bash
+curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/budget/notify \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+O retorno contém a prévia do e-mail e os links públicos de aprovação e recusa.
+
+### 4. Aprovar orçamento administrativamente
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/approve \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### 4. Finalizar OS
+### 5. Finalizar OS
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/finish \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### 5. Entregar OS
+### 6. Entregar OS
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/deliver \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### 6. Consulta pública do cliente
+### 7. Consulta pública do cliente
 
 ```bash
 curl "http://localhost:8080/api/v1/public/work-orders/{code}/status?document=52998224725"
@@ -709,7 +753,7 @@ Peças:
 
 ## Observações sobre o MVP
 
-- Não há envio real de notificação para o cliente. O orçamento fica disponível na resposta da API e a OS passa para `WAITING_APPROVAL`.
+- Não há envio real de e-mail: o adapter local gera a prévia, registra a mensagem no log e retorna seu conteúdo. Mailpit/outbox ficam para uma etapa posterior.
 - Não há módulo financeiro completo. O foco está em orçamento, autorização, execução e controle de estoque.
 - A baixa de estoque acontece na aprovação do orçamento, não na criação da OS.
 - O endpoint público exige documento do cliente para evitar consulta aberta apenas pelo código da OS.

@@ -11,6 +11,7 @@ import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.vehicle.VehicleResp
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.AddWorkOrderItemsRequest;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.AverageExecutionTimeResponse;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.BudgetDecisionRequest;
+import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.BudgetNotificationResponse;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.CreateWorkOrderRequest;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.PublicWorkOrderStatusResponse;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.WorkOrderPartItemResponse;
@@ -26,6 +27,7 @@ import br.com.fiap.techchallenge.oficina.application.port.in.ManagePartsUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageServiceCatalogUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageVehiclesUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.result.CustomerResult;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.BudgetNotificationResult;
 import br.com.fiap.techchallenge.oficina.application.port.in.result.PartResult;
 import br.com.fiap.techchallenge.oficina.application.port.in.result.PublicWorkOrderStatusResult;
 import br.com.fiap.techchallenge.oficina.application.port.in.result.ServiceCatalogResult;
@@ -160,6 +162,13 @@ public final class WebDtoMapper {
             order.code(), order.status(), order.statusLabel(), order.customerName(),
             order.vehiclePlate(), order.vehicleDescription(), order.diagnosticNotes(), order.totalAmount(),
             order.customerAuthorizedAt(), order.startedAt(), order.finishedAt(), order.deliveredAt(), order.updatedAt()
+        );
+    }
+
+    public static BudgetNotificationResponse toResponse(BudgetNotificationResult notification) {
+        return new BudgetNotificationResponse(
+            notification.workOrderCode(), notification.channel(), notification.recipient(), notification.subject(),
+            notification.body(), notification.approveUrl(), notification.rejectUrl()
         );
     }
 

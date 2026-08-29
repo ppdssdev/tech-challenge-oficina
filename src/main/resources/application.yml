@@ -37,6 +37,7 @@ management:
         include: health,info,metrics
 
 app:
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
   jwt:
     secret: ${APP_JWT_SECRET:awssecretpostech-oficina-fiap-2026}
     expiration-minutes: ${APP_JWT_EXPIRATION_MINUTES:120}

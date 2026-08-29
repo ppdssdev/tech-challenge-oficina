@@ -1,8 +1,27 @@
 package br.com.fiap.techchallenge.oficina.application.port.out;
 
-import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrder;
+import java.math.BigDecimal;
 
-/** Ponto de extensão para notificações, sem introduzir infraestrutura nesta entrega. */
 public interface NotificationPort {
-    void budgetAwaitingApproval(WorkOrder order);
+    NotificationDeliveryResult sendBudgetDecisionNotification(BudgetDecisionNotification notification);
+
+    record BudgetDecisionNotification(
+        String workOrderCode,
+        String customerName,
+        String customerEmail,
+        BigDecimal totalAmount,
+        String approveUrl,
+        String rejectUrl
+    ) {
+    }
+
+    record NotificationDeliveryResult(
+        String channel,
+        String recipient,
+        String subject,
+        String body,
+        String approveUrl,
+        String rejectUrl
+    ) {
+    }
 }

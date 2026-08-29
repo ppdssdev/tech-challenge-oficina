@@ -2,6 +2,7 @@ package br.com.fiap.techchallenge.oficina.api;
 
 import br.com.fiap.techchallenge.oficina.OficinaApplication;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -137,21 +138,56 @@ class WorkOrderFlowIntegrationTest {
     }
 
     @Test
-    void shouldApproveBudgetThroughPublicEndpointWithoutJwt() {
+    void shouldNotifyAndApproveBudgetThroughPublicEndpointWithoutJwt() {
         String token = login();
         HttpHeaders adminHeaders = adminHeaders(token);
         UUID serviceId = createService(adminHeaders);
         UUID partId = createPart(adminHeaders);
         ResponseEntity<Map<String, Object>> created = createOrder(adminHeaders, serviceId, partId);
+        String orderId = requiredValue(created, "id").toString();
         String code = requiredValue(created, "code").toString();
 
+        ResponseEntity<Map<String, Object>> notification = postWithoutBody(
+            "/api/v1/admin/work-orders/" + orderId + "/budget/notify", adminHeaders
+        );
+        assertThat(notification.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(requiredValue(notification, "channel")).isEqualTo("SIMULATED_EMAIL");
+        assertThat(requiredValue(notification, "recipient")).isEqualTo("maria@email.com");
+        assertThat(requiredValue(notification, "subject").toString()).contains(code);
+        assertThat(requiredValue(notification, "body").toString())
+            .contains("\"document\": \"seu CPF ou CNPJ\"");
+        assertThat(requiredValue(notification, "rejectUrl").toString())
+            .endsWith("/api/v1/public/work-orders/" + code + "/budget/reject");
+        String approvePath = URI.create(requiredValue(notification, "approveUrl").toString()).getPath();
+
         ResponseEntity<Map<String, Object>> approved = postPublicBudgetDecision(
-            "/api/v1/public/work-orders/" + code + "/budget/approve",
+            approvePath,
             Map.of("document", "529.982.247-25")
         );
 
         assertThat(approved.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(requiredValue(approved, "status")).isEqualTo("IN_EXECUTION");
+
+        ResponseEntity<Map<String, Object>> publicStatus = restTemplate.exchange(
+            url("/api/v1/public/work-orders/" + code + "/status?document=52998224725"),
+            HttpMethod.GET,
+            HttpEntity.EMPTY,
+            JSON_OBJECT
+        );
+        assertThat(publicStatus.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(requiredValue(publicStatus, "status")).isEqualTo("IN_EXECUTION");
+    }
+
+    @Test
+    void shouldRequireJwtToNotifyBudget() {
+        ResponseEntity<String> response = restTemplate.exchange(
+            url("/api/v1/admin/work-orders/" + UUID.randomUUID() + "/budget/notify"),
+            HttpMethod.POST,
+            HttpEntity.EMPTY,
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test

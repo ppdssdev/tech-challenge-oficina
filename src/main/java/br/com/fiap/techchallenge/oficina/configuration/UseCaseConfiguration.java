@@ -14,11 +14,13 @@ import br.com.fiap.techchallenge.oficina.application.port.in.ManageCustomersUseC
 import br.com.fiap.techchallenge.oficina.application.port.in.ManagePartsUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageServiceCatalogUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageVehiclesUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.NotifyBudgetUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.StartDiagnosisUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.UpdateDiagnosisUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.out.CredentialVerifierPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.CustomerRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.PartRepositoryPort;
+import br.com.fiap.techchallenge.oficina.application.port.out.NotificationPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.ServiceCatalogRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.TokenIssuerPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.TransactionPort;
@@ -38,10 +40,12 @@ import br.com.fiap.techchallenge.oficina.application.usecase.ManageCustomersServ
 import br.com.fiap.techchallenge.oficina.application.usecase.ManagePartsService;
 import br.com.fiap.techchallenge.oficina.application.usecase.ManageServiceCatalogService;
 import br.com.fiap.techchallenge.oficina.application.usecase.ManageVehiclesService;
+import br.com.fiap.techchallenge.oficina.application.usecase.NotifyBudgetService;
 import br.com.fiap.techchallenge.oficina.application.usecase.StartDiagnosisService;
 import br.com.fiap.techchallenge.oficina.application.usecase.UpdateDiagnosisService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 
 @Configuration
 public class UseCaseConfiguration {
@@ -98,6 +102,15 @@ public class UseCaseConfiguration {
         WorkOrderRepositoryPort orders, PartRepositoryPort parts, TransactionPort tx
     ) {
         return new ExternalBudgetDecisionService(orders, parts, tx);
+    }
+
+    @Bean NotifyBudgetUseCase notifyBudget(
+        WorkOrderRepositoryPort orders,
+        NotificationPort notifications,
+        TransactionPort tx,
+        @Value("${app.public-base-url}") String publicBaseUrl
+    ) {
+        return new NotifyBudgetService(orders, notifications, tx, publicBaseUrl);
     }
 
     @Bean FinishWorkOrderUseCase finishWorkOrder(WorkOrderRepositoryPort orders, TransactionPort tx) {
