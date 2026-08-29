@@ -10,7 +10,7 @@ O Terraform:
 4. executa `kubectl apply -k` sobre `k8s/local`;
 5. aguarda os Deployments do PostgreSQL, Mailpit, API, Prometheus e Grafana.
 
-Como `k8s/local` é a fonte de verdade e agora inclui a stack de observabilidade, `terraform apply` também sobe Prometheus e Grafana sem recursos HCL duplicados.
+Como `k8s/local` é a fonte de verdade e inclui a stack de observabilidade e o HPA da API, `terraform apply` também sobe Prometheus, Grafana e o `oficina-api-hpa` sem recursos HCL duplicados.
 
 Os manifests de `k8s/local` continuam sendo a fonte de verdade dos recursos Kubernetes. Eles não foram duplicados em HCL. O arquivo `k8s/kind/oficina-kind.yaml` também é lido pelo módulo e convertido para o formato aceito pelo provider Kind.
 
@@ -76,7 +76,19 @@ kubectl -n oficina get svc
 kubectl -n oficina rollout status deployment/oficina-api --timeout=300s
 kubectl -n oficina rollout status deployment/oficina-prometheus --timeout=180s
 kubectl -n oficina rollout status deployment/oficina-grafana --timeout=180s
+kubectl -n oficina get hpa oficina-api-hpa
 ```
+
+O HPA escala o Deployment `oficina-api` de 1 a 3 réplicas com alvos de utilização média de 70% de CPU e 75% de memória. Para que o Kind forneça essas métricas, instale o Metrics Server a partir da raiz do projeto, depois de selecionar o kubeconfig gerado pelo Terraform:
+
+```bash
+./scripts/k8s-install-metrics-server.sh
+kubectl -n oficina top pods
+kubectl -n oficina get hpa
+kubectl -n oficina describe hpa oficina-api-hpa
+```
+
+Sem Metrics Server, o Terraform ainda aplica o HPA, mas as métricas podem aparecer como `<unknown>`. Em um cluster cloud real, o serviço de métricas de recursos precisa estar habilitado. O HPA deste projeto escala apenas a API; PostgreSQL e os demais componentes não fazem parte do alvo de autoscaling.
 
 Mantenha o port-forward da API em um terminal:
 
@@ -113,7 +125,7 @@ O port-forward permanece manual e também pode ser iniciado pelo script existent
 
 O script respeita a variável `KUBECONFIG` exportada acima.
 
-Os outputs `prometheus_url`, `grafana_url`, `prometheus_port_forward_command` e `grafana_port_forward_command` documentam esses acessos, junto aos outputs existentes da API e do Mailpit. As URLs pressupõem que os respectivos port-forwards estejam ativos.
+Os outputs `prometheus_url`, `grafana_url`, `prometheus_port_forward_command` e `grafana_port_forward_command` documentam esses acessos, junto aos outputs existentes da API e do Mailpit. Os outputs `hpa_status_command`, `hpa_describe_command` e `top_pods_command` fornecem os comandos de diagnóstico do autoscaling. As URLs pressupõem que os respectivos port-forwards estejam ativos.
 
 ## Destruir
 

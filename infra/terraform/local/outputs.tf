@@ -57,3 +57,18 @@ output "manual_validation_command" {
   description = "Comando de validação manual do Actuator."
   value       = "curl http://localhost:${var.api_port}/actuator/health"
 }
+
+output "hpa_status_command" {
+  description = "Comando para consultar o estado do HPA da API."
+  value       = "kubectl -n ${var.namespace} get hpa"
+}
+
+output "hpa_describe_command" {
+  description = "Comando para detalhar o HPA da API."
+  value       = "kubectl -n ${var.namespace} describe hpa oficina-api-hpa"
+}
+
+output "top_pods_command" {
+  description = "Comando para consultar métricas de recursos dos pods."
+  value       = "kubectl -n ${var.namespace} top pods"
+}

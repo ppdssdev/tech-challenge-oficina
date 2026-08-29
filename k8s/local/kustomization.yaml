@@ -7,5 +7,6 @@ resources:
   - postgres.yaml
   - mailpit.yaml
   - api.yaml
+  - hpa.yaml
   - prometheus.yaml
   - grafana.yaml

@@ -50,16 +50,16 @@ class ListWorkOrdersServiceTest {
         var result = useCase.list(null);
 
         assertThat(result).extracting(summary -> summary.status()).containsExactly(
-            WorkOrderStatus.WAITING_APPROVAL,
-            WorkOrderStatus.WAITING_APPROVAL,
             WorkOrderStatus.IN_EXECUTION,
+            WorkOrderStatus.WAITING_APPROVAL,
+            WorkOrderStatus.WAITING_APPROVAL,
             WorkOrderStatus.IN_DIAGNOSIS,
             WorkOrderStatus.RECEIVED
         );
         assertThat(result).extracting(summary -> summary.code()).containsExactly(
+            "OS-EXECUTION",
             "OS-APPROVAL-OLDER",
             "OS-APPROVAL-NEWER",
-            "OS-EXECUTION",
             "OS-DIAGNOSIS",
             "OS-RECEIVED"
         );

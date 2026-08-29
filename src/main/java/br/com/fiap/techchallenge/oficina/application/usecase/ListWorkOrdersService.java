@@ -55,8 +55,8 @@ public final class ListWorkOrdersService implements ListWorkOrdersUseCase {
 
     private static Map<WorkOrderStatus, Integer> operationalPriority() {
         var priorities = new EnumMap<WorkOrderStatus, Integer>(WorkOrderStatus.class);
-        priorities.put(WorkOrderStatus.WAITING_APPROVAL, 1);
-        priorities.put(WorkOrderStatus.IN_EXECUTION, 2);
+        priorities.put(WorkOrderStatus.IN_EXECUTION, 1);
+        priorities.put(WorkOrderStatus.WAITING_APPROVAL, 2);
         priorities.put(WorkOrderStatus.IN_DIAGNOSIS, 3);
         priorities.put(WorkOrderStatus.RECEIVED, 4);
         return Map.copyOf(priorities);

@@ -525,6 +525,31 @@ kubectl -n oficina describe pod -l app=oficina-api
 kubectl -n oficina logs deployment/oficina-api
 ```
 
+### Horizontal Pod Autoscaler (HPA)
+
+O Kustomize inclui o HPA `oficina-api-hpa`, que escala somente o Deployment `oficina-api` entre 1 e 3 réplicas. Os alvos médios de utilização são 70% de CPU e 75% de memória. O Deployment declara `resources.requests` e `resources.limits` para ambos os recursos, incluindo os requests necessários para que o HPA calcule a utilização.
+
+O HPA é criado normalmente por `kubectl apply -k k8s/local`. Para receber métricas de CPU e memória no Kind, instale o Metrics Server com o script local:
+
+```bash
+./scripts/k8s-install-metrics-server.sh
+```
+
+O script aplica o manifest oficial no namespace `kube-system`, habilita `--kubelet-insecure-tls` para compatibilidade com o Kind e aguarda o rollout. Sem Metrics Server, o recurso HPA continua criado, mas seus valores podem aparecer como `<unknown>` e não haverá escala baseada nessas métricas. Em clusters de cloud, como EKS, AKS ou GKE, o serviço de métricas de recursos deve estar instalado ou habilitado conforme a configuração do cluster.
+
+Comandos de validação:
+
+```bash
+kubectl apply -k k8s/local
+kubectl -n oficina get hpa
+kubectl -n oficina describe hpa oficina-api-hpa
+kubectl -n oficina top pods
+```
+
+O HPA não escala PostgreSQL, Mailpit, Prometheus ou Grafana. Em produção, o banco exige uma estratégia própria, como serviço gerenciado (RDS/Aurora), replicação e tuning adequados à carga.
+
+A API também contém um scheduler da outbox. No ambiente acadêmico/local, o HPA demonstra a elasticidade da API, mas o processador atual não possui claim/locking atômico entre réplicas. Em produção, o processamento da outbox deve usar locking transacional, estado `PROCESSING`, `SELECT FOR UPDATE SKIP LOCKED`, worker separado ou mecanismo equivalente para impedir o envio duplicado quando mais de uma réplica executar o scheduler.
+
 ### 4. Acessar e validar a API
 
 Em um terminal, mantenha o port-forward ativo:
@@ -810,7 +835,7 @@ DELETE /api/v1/admin/parts/{id}
 
 ### Ordens de Serviço
 
-`GET /api/v1/admin/work-orders` sem o parâmetro `status` retorna a fila operacional da oficina. A fila contém somente OS nos status `RECEIVED`, `IN_DIAGNOSIS`, `WAITING_APPROVAL` e `IN_EXECUTION`, priorizadas nessa ordem de atendimento: `WAITING_APPROVAL`, `IN_EXECUTION`, `IN_DIAGNOSIS` e `RECEIVED`. Dentro do mesmo status, as OS mais antigas aparecem primeiro.
+`GET /api/v1/admin/work-orders` sem o parâmetro `status` retorna a fila operacional da oficina. A fila contém somente OS nos status `RECEIVED`, `IN_DIAGNOSIS`, `WAITING_APPROVAL` e `IN_EXECUTION`, priorizadas nessa ordem de atendimento: `IN_EXECUTION`, `WAITING_APPROVAL`, `IN_DIAGNOSIS` e `RECEIVED`. Dentro do mesmo status, as OS mais antigas aparecem primeiro.
 
 OS nos status `BUDGET_REJECTED`, `FINALIZED` e `DELIVERED` não são exibidas na fila operacional padrão, mas continuam disponíveis por meio do filtro explícito, por exemplo `?status=BUDGET_REJECTED`, `?status=FINALIZED` ou `?status=DELIVERED`.
 

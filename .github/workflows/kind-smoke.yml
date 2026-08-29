@@ -58,6 +58,9 @@ jobs:
           kubectl -n oficina rollout status deployment/oficina-prometheus --timeout=180s
           kubectl -n oficina rollout status deployment/oficina-grafana --timeout=180s
 
+      - name: Validate API HPA resource
+        run: kubectl -n oficina get hpa oficina-api-hpa
+
       - name: Validate API health and metrics
         run: |
           kubectl -n oficina port-forward service/oficina-api 8080:8080 \

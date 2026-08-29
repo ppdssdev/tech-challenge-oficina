@@ -10,3 +10,4 @@ kubectl -n oficina rollout status deployment/oficina-mailpit --timeout=180s
 kubectl -n oficina rollout status deployment/oficina-api --timeout=300s
 kubectl -n oficina rollout status deployment/oficina-prometheus --timeout=180s
 kubectl -n oficina rollout status deployment/oficina-grafana --timeout=180s
+kubectl -n oficina get hpa oficina-api-hpa
