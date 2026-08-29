@@ -11,4 +11,6 @@ public interface SpringDataNotificationOutboxRepository
     extends JpaRepository<NotificationOutboxJpaEntity, UUID> {
 
     List<NotificationOutboxJpaEntity> findByStatusOrderByCreatedAtAsc(Status status, Pageable pageable);
+
+    long countByStatus(Status status);
 }

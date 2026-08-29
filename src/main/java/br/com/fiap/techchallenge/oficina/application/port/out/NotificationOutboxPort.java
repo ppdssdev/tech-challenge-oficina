@@ -7,6 +7,7 @@ import java.util.UUID;
 public interface NotificationOutboxPort {
     NotificationOutboxMessage enqueueBudgetDecision(NotificationOutboxMessage message);
     List<NotificationOutboxMessage> findPending(int limit);
+    long countByStatus(Status status);
     void markSent(UUID id);
     void markFailed(UUID id, String errorMessage);
 

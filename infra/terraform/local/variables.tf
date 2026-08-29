@@ -45,3 +45,15 @@ variable "mailpit_ui_port" {
   type        = number
   default     = 8025
 }
+
+variable "prometheus_port" {
+  description = "Porta local usada no port-forward do Prometheus."
+  type        = number
+  default     = 9090
+}
+
+variable "grafana_port" {
+  description = "Porta local usada no port-forward do Grafana."
+  type        = number
+  default     = 3000
+}

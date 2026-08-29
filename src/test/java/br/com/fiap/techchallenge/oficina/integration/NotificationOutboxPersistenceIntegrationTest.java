@@ -72,6 +72,23 @@ class NotificationOutboxPersistenceIntegrationTest extends PostgresIntegrationTe
         assertThat(notificationOutbox.findPending(10)).isEmpty();
     }
 
+    @Test
+    void shouldCountMessagesByStatusForObservability() {
+        NotificationOutboxMessage pending = notificationOutbox.enqueueBudgetDecision(message("OS-001"));
+        NotificationOutboxMessage sent = notificationOutbox.enqueueBudgetDecision(message("OS-002"));
+        NotificationOutboxMessage failed = notificationOutbox.enqueueBudgetDecision(message("OS-003"));
+
+        notificationOutbox.markSent(sent.id());
+        notificationOutbox.markFailed(failed.id(), "SMTP indisponível");
+
+        assertThat(notificationOutbox.countByStatus(Status.PENDING)).isEqualTo(1);
+        assertThat(notificationOutbox.countByStatus(Status.SENT)).isEqualTo(1);
+        assertThat(notificationOutbox.countByStatus(Status.FAILED)).isEqualTo(1);
+        assertThat(notificationOutbox.findPending(10))
+            .extracting(NotificationOutboxMessage::id)
+            .containsExactly(pending.id());
+    }
+
     private Map<String, Object> findState(UUID id) {
         return jdbcTemplate.queryForMap("""
             select status, attempts, last_error, sent_at

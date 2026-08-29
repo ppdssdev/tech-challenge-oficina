@@ -42,10 +42,18 @@ springdoc:
     path: /v3/api-docs
 
 management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
 
 app:
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}

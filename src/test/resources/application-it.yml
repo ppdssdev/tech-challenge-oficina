@@ -16,3 +16,8 @@ app:
   admin:
     default-username: admin
     default-password: admin123
+
+management:
+  health:
+    mail:
+      enabled: false

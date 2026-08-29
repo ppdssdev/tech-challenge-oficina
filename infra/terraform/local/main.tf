@@ -81,6 +81,8 @@ resource "null_resource" "k8s_apply" {
       kubectl --kubeconfig "$KUBECONFIG_FILE" -n "$NAMESPACE" rollout status deployment/oficina-postgres --timeout=180s
       kubectl --kubeconfig "$KUBECONFIG_FILE" -n "$NAMESPACE" rollout status deployment/oficina-mailpit --timeout=180s
       kubectl --kubeconfig "$KUBECONFIG_FILE" -n "$NAMESPACE" rollout status deployment/oficina-api --timeout=300s
+      kubectl --kubeconfig "$KUBECONFIG_FILE" -n "$NAMESPACE" rollout status deployment/oficina-prometheus --timeout=180s
+      kubectl --kubeconfig "$KUBECONFIG_FILE" -n "$NAMESPACE" rollout status deployment/oficina-grafana --timeout=180s
     EOT
 
     environment = {

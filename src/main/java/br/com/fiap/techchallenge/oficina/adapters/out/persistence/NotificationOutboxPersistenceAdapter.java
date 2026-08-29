@@ -41,6 +41,11 @@ public class NotificationOutboxPersistenceAdapter implements NotificationOutboxP
     }
 
     @Override
+    public long countByStatus(Status status) {
+        return repository.countByStatus(status);
+    }
+
+    @Override
     public void markSent(UUID id) {
         var entity = required(id);
         entity.setStatus(Status.SENT);

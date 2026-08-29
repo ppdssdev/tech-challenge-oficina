@@ -8,7 +8,9 @@ O Terraform:
 2. builda a imagem `tech-challenge-oficina:local` com o Docker local;
 3. carrega a imagem diretamente no cluster, sem registry externo;
 4. executa `kubectl apply -k` sobre `k8s/local`;
-5. aguarda os Deployments do PostgreSQL, Mailpit e API.
+5. aguarda os Deployments do PostgreSQL, Mailpit, API, Prometheus e Grafana.
+
+Como `k8s/local` é a fonte de verdade e agora inclui a stack de observabilidade, `terraform apply` também sobe Prometheus e Grafana sem recursos HCL duplicados.
 
 Os manifests de `k8s/local` continuam sendo a fonte de verdade dos recursos Kubernetes. Eles não foram duplicados em HCL. O arquivo `k8s/kind/oficina-kind.yaml` também é lido pelo módulo e convertido para o formato aceito pelo provider Kind.
 
@@ -72,6 +74,8 @@ Confirme os recursos:
 kubectl -n oficina get pods
 kubectl -n oficina get svc
 kubectl -n oficina rollout status deployment/oficina-api --timeout=300s
+kubectl -n oficina rollout status deployment/oficina-prometheus --timeout=180s
+kubectl -n oficina rollout status deployment/oficina-grafana --timeout=180s
 ```
 
 Mantenha o port-forward da API em um terminal:
@@ -92,6 +96,15 @@ Para acessar o Mailpit, mantenha outro port-forward ativo e abra `http://localho
 kubectl -n oficina port-forward svc/oficina-mailpit 8025:8025
 ```
 
+Prometheus e Grafana também são acessados somente por port-forward:
+
+```bash
+kubectl -n oficina port-forward svc/oficina-prometheus 9090:9090
+kubectl -n oficina port-forward svc/oficina-grafana 3000:3000
+```
+
+Depois, acesse `http://localhost:9090` e `http://localhost:3000`. O Grafana usa as credenciais locais `admin` / `admin`.
+
 O port-forward permanece manual e também pode ser iniciado pelo script existente:
 
 ```bash
@@ -99,6 +112,8 @@ O port-forward permanece manual e também pode ser iniciado pelo script existent
 ```
 
 O script respeita a variável `KUBECONFIG` exportada acima.
+
+Os outputs `prometheus_url`, `grafana_url`, `prometheus_port_forward_command` e `grafana_port_forward_command` documentam esses acessos, junto aos outputs existentes da API e do Mailpit. As URLs pressupõem que os respectivos port-forwards estejam ativos.
 
 ## Destruir
 

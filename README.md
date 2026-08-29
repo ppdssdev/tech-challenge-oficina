@@ -15,11 +15,14 @@ O projeto foi construído como **monólito Spring Boot com arquitetura hexagonal
 - Spring Mail
 - Spring Security
 - JWT
+- Spring Boot Actuator e Micrometer Prometheus
 - PostgreSQL
 - Flyway
 - Swagger/OpenAPI
 - Docker e Docker Compose
+- Prometheus e Grafana locais
 - Mailpit para SMTP e caixa de e-mail locais
+- Kubernetes local com Kind e Terraform local
 - JUnit 5
 - JaCoCo
 - H2 para testes rápidos de unidade/aplicação
@@ -401,9 +404,58 @@ mvn spring-boot:run
 
 ---
 
+## Observabilidade local
+
+A API publica métricas do Spring Boot Actuator no endpoint `/actuator/prometheus` usando Micrometer Prometheus. O Prometheus coleta essas métricas a cada 15 segundos, e o Grafana recebe automaticamente o datasource Prometheus e o dashboard versionado **Oficina API - Observabilidade local**.
+
+O dashboard apresenta status da API, taxa e latência média das requisições HTTP, memória da JVM, CPU do processo e quantidades da outbox nos estados `PENDING` e `FAILED`. Toda a solução é gratuita e executada localmente: não usa Grafana Cloud, Datadog, New Relic, CloudWatch ou qualquer outro serviço pago. Também não inclui tracing distribuído, Loki, Alertmanager, Helm ou Prometheus Operator.
+
+### Docker Compose
+
+Suba todo o ambiente em segundo plano:
+
+```bash
+docker compose up -d --build
+```
+
+Serviços disponíveis:
+
+```text
+API:                 http://localhost:8080
+Health:              http://localhost:8080/actuator/health
+Métricas Prometheus: http://localhost:8080/actuator/prometheus
+Prometheus:          http://localhost:9090
+Grafana:             http://localhost:3000
+Mailpit:             http://localhost:8025
+```
+
+O acesso inicial do Grafana é `admin` / `admin`. No Prometheus, consulte **Status > Targets** e confirme o target `oficina-api` como `UP`. No Grafana, abra a pasta **Oficina** para acessar o dashboard provisionado.
+
+### Kubernetes/Kind
+
+Depois de criar o cluster e carregar a imagem local conforme a seção seguinte, aplique todos os manifests — incluindo Prometheus e Grafana — e inicie os quatro port-forwards:
+
+```bash
+kubectl apply -k k8s/local
+./scripts/k8s-port-forward.sh
+```
+
+O script expõe API em `8080`, Mailpit em `8025`, Prometheus em `9090` e Grafana em `3000`. Pressione `Ctrl+C` para encerrar todos. Os comandos equivalentes são:
+
+```bash
+kubectl -n oficina port-forward svc/oficina-api 8080:8080
+kubectl -n oficina port-forward svc/oficina-mailpit 8025:8025
+kubectl -n oficina port-forward svc/oficina-prometheus 9090:9090
+kubectl -n oficina port-forward svc/oficina-grafana 3000:3000
+```
+
+Os quatro Services são `ClusterIP`; não há Ingress, `NodePort` ou `LoadBalancer`.
+
+---
+
 ## Execução local com Kubernetes/Kind
 
-Esta opção executa gratuitamente a API, o PostgreSQL e o Mailpit dentro de um cluster Kubernetes local criado com Kind. Ela não usa EKS ou outro serviço de cloud, registry privado, Helm, Ingress ou `LoadBalancer`; os acessos locais são feitos com `port-forward`.
+Esta opção executa gratuitamente a API, o PostgreSQL, o Mailpit, o Prometheus e o Grafana dentro de um cluster Kubernetes local criado com Kind. Ela não usa EKS ou outro serviço de cloud, registry privado, Helm, Ingress ou `LoadBalancer`; os acessos locais são feitos com `port-forward`.
 
 ### Pré-requisitos
 
@@ -453,7 +505,7 @@ kubectl get pods -n oficina
 kubectl get svc -n oficina
 ```
 
-O script de deploy também aguarda PostgreSQL e Mailpit antes de aguardar a API:
+O script de deploy aguarda os Deployments do PostgreSQL, Mailpit, API, Prometheus e Grafana:
 
 ```bash
 ./scripts/k8s-deploy-local.sh
@@ -506,7 +558,7 @@ kubectl -n oficina port-forward svc/oficina-mailpit 8025:8025
 
 Acesse `http://localhost:8025`. Dentro do cluster, a API envia os e-mails por `oficina-mailpit:1025`. Como `APP_PUBLIC_BASE_URL` vale `http://localhost:8080`, os links de aprovação ou recusa enviados por e-mail funcionam enquanto o port-forward da API estiver ativo.
 
-Para iniciar os dois port-forwards com um único comando e encerrá-los juntos com `Ctrl+C`:
+Para iniciar os quatro port-forwards com um único comando e encerrá-los juntos com `Ctrl+C`:
 
 ```bash
 ./scripts/k8s-port-forward.sh
