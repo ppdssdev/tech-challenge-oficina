@@ -1,8 +1,7 @@
 package br.com.fiap.techchallenge.oficina.application;
 
-import br.com.fiap.techchallenge.oficina.application.port.out.NotificationPort;
-import br.com.fiap.techchallenge.oficina.application.port.out.NotificationPort.BudgetDecisionNotification;
-import br.com.fiap.techchallenge.oficina.application.port.out.NotificationPort.NotificationDeliveryResult;
+import br.com.fiap.techchallenge.oficina.application.port.out.NotificationOutboxPort;
+import br.com.fiap.techchallenge.oficina.application.port.out.NotificationOutboxPort.NotificationOutboxMessage;
 import br.com.fiap.techchallenge.oficina.application.port.out.TransactionPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.WorkOrderRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.usecase.NotifyBudgetService;
@@ -38,30 +37,26 @@ class NotifyBudgetServiceTest {
     WorkOrderRepositoryPort workOrderRepository;
 
     @Mock
-    NotificationPort notificationPort;
+    NotificationOutboxPort outboxPort;
 
     private final TransactionPort transactions = TransactionPort.direct();
 
     @Test
-    void shouldGenerateSimulatedNotificationForBudgetWaitingApprovalWithoutChangingStatus() {
+    void shouldEnqueuePendingMailpitNotificationWithoutChangingWorkOrderStatus() {
         UUID id = UUID.randomUUID();
         var order = waitingApprovalOrder("maria@email.com");
         when(workOrderRepository.findDetailedById(id)).thenReturn(Optional.of(order));
-        when(notificationPort.sendBudgetDecisionNotification(any())).thenAnswer(invocation -> {
-            BudgetDecisionNotification notification = invocation.getArgument(0);
-            return new NotificationDeliveryResult(
-                "SIMULATED_EMAIL", notification.customerEmail(), "Assunto simulado", "Corpo simulado",
-                notification.approveUrl(), notification.rejectUrl()
-            );
-        });
+        when(outboxPort.enqueueBudgetDecision(any())).thenAnswer(invocation -> invocation.getArgument(0));
         var useCase = new NotifyBudgetService(
-            workOrderRepository, notificationPort, transactions, "http://localhost:8080/"
+            workOrderRepository, outboxPort, transactions, "http://localhost:8080/"
         );
 
         var result = useCase.notifyBudget(id);
 
-        assertThat(result.channel()).isEqualTo("SIMULATED_EMAIL");
+        assertThat(result.channel()).isEqualTo("MAILPIT_EMAIL");
         assertThat(result.recipient()).isEqualTo("maria@email.com");
+        assertThat(result.subject()).contains("OS-NOTIFY-001");
+        assertThat(result.body()).contains("R$ 120,00");
         assertThat(result.approveUrl()).isEqualTo(
             "http://localhost:8080/api/v1/public/work-orders/OS-NOTIFY-001/budget/approve"
         );
@@ -71,10 +66,11 @@ class NotifyBudgetServiceTest {
         assertThat(order.getStatus()).isEqualTo(WorkOrderStatus.WAITING_APPROVAL);
         verify(workOrderRepository, never()).save(any());
 
-        var notificationCaptor = ArgumentCaptor.forClass(BudgetDecisionNotification.class);
-        verify(notificationPort).sendBudgetDecisionNotification(notificationCaptor.capture());
-        assertThat(notificationCaptor.getValue().workOrderCode()).isEqualTo("OS-NOTIFY-001");
-        assertThat(notificationCaptor.getValue().totalAmount()).isEqualByComparingTo("120.00");
+        var messageCaptor = ArgumentCaptor.forClass(NotificationOutboxMessage.class);
+        verify(outboxPort).enqueueBudgetDecision(messageCaptor.capture());
+        assertThat(messageCaptor.getValue().status()).isEqualTo(NotificationOutboxPort.Status.PENDING);
+        assertThat(messageCaptor.getValue().channel()).isEqualTo(NotificationOutboxPort.Channel.MAILPIT_EMAIL);
+        assertThat(messageCaptor.getValue().workOrderCode()).isEqualTo("OS-NOTIFY-001");
     }
 
     @Test
@@ -83,14 +79,14 @@ class NotifyBudgetServiceTest {
         var order = receivedOrder("maria@email.com");
         when(workOrderRepository.findDetailedById(id)).thenReturn(Optional.of(order));
         var useCase = new NotifyBudgetService(
-            workOrderRepository, notificationPort, transactions, "http://localhost:8080"
+            workOrderRepository, outboxPort, transactions, "http://localhost:8080"
         );
 
         assertThatThrownBy(() -> useCase.notifyBudget(id))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining("aguardando aprovação");
 
-        verifyNoInteractions(notificationPort);
+        verifyNoInteractions(outboxPort);
     }
 
     @Test
@@ -98,14 +94,14 @@ class NotifyBudgetServiceTest {
         UUID id = UUID.randomUUID();
         when(workOrderRepository.findDetailedById(id)).thenReturn(Optional.empty());
         var useCase = new NotifyBudgetService(
-            workOrderRepository, notificationPort, transactions, "http://localhost:8080"
+            workOrderRepository, outboxPort, transactions, "http://localhost:8080"
         );
 
         assertThatThrownBy(() -> useCase.notifyBudget(id))
             .isInstanceOf(NotFoundException.class)
             .hasMessageContaining("Ordem de serviço não encontrada");
 
-        verifyNoInteractions(notificationPort);
+        verifyNoInteractions(outboxPort);
     }
 
     @Test
@@ -114,14 +110,14 @@ class NotifyBudgetServiceTest {
         var order = waitingApprovalOrder(null);
         when(workOrderRepository.findDetailedById(id)).thenReturn(Optional.of(order));
         var useCase = new NotifyBudgetService(
-            workOrderRepository, notificationPort, transactions, "http://localhost:8080"
+            workOrderRepository, outboxPort, transactions, "http://localhost:8080"
         );
 
         assertThatThrownBy(() -> useCase.notifyBudget(id))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining("não possui e-mail");
 
-        verifyNoInteractions(notificationPort);
+        verifyNoInteractions(outboxPort);
     }
 
     private WorkOrder waitingApprovalOrder(String email) {

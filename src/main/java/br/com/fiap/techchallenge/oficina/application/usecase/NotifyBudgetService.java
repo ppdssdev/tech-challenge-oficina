@@ -2,8 +2,7 @@ package br.com.fiap.techchallenge.oficina.application.usecase;
 
 import br.com.fiap.techchallenge.oficina.application.port.in.NotifyBudgetUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.result.BudgetNotificationResult;
-import br.com.fiap.techchallenge.oficina.application.port.out.NotificationPort;
-import br.com.fiap.techchallenge.oficina.application.port.out.NotificationPort.BudgetDecisionNotification;
+import br.com.fiap.techchallenge.oficina.application.port.out.NotificationOutboxPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.TransactionPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.WorkOrderRepositoryPort;
 import br.com.fiap.techchallenge.oficina.domain.exception.BusinessException;
@@ -14,20 +13,22 @@ import java.util.UUID;
 public final class NotifyBudgetService implements NotifyBudgetUseCase {
 
     private final WorkOrderRepositoryPort workOrders;
-    private final NotificationPort notifications;
+    private final NotificationOutboxPort outbox;
     private final TransactionPort transactions;
     private final String publicBaseUrl;
+    private final BudgetNotificationMessageFactory messageFactory;
 
     public NotifyBudgetService(
         WorkOrderRepositoryPort workOrders,
-        NotificationPort notifications,
+        NotificationOutboxPort outbox,
         TransactionPort transactions,
         String publicBaseUrl
     ) {
         this.workOrders = workOrders;
-        this.notifications = notifications;
+        this.outbox = outbox;
         this.transactions = transactions;
         this.publicBaseUrl = normalizeBaseUrl(publicBaseUrl);
+        this.messageFactory = new BudgetNotificationMessageFactory();
     }
 
     @Override
@@ -45,14 +46,15 @@ public final class NotifyBudgetService implements NotifyBudgetUseCase {
             }
 
             String decisionPath = "/api/v1/public/work-orders/" + order.getCode() + "/budget/";
-            var delivery = notifications.sendBudgetDecisionNotification(new BudgetDecisionNotification(
+            var message = messageFactory.create(
                 order.getCode(), customer.getFullName(), customer.getEmail(), order.getTotalAmount(),
                 publicBaseUrl + decisionPath + "approve", publicBaseUrl + decisionPath + "reject"
-            ));
+            );
+            var queued = outbox.enqueueBudgetDecision(message);
 
             return new BudgetNotificationResult(
-                order.getCode(), delivery.channel(), delivery.recipient(), delivery.subject(), delivery.body(),
-                delivery.approveUrl(), delivery.rejectUrl()
+                order.getCode(), queued.channel().name(), queued.recipient(), queued.subject(), queued.body(),
+                queued.approveUrl(), queued.rejectUrl()
             );
         });
     }

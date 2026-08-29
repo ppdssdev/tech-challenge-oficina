@@ -114,7 +114,7 @@ public class WorkOrderController {
     }
 
     @PostMapping("/{id}/budget/notify")
-    @Operation(summary = "Gera prévia local da notificação do orçamento aguardando aprovação")
+    @Operation(summary = "Enfileira a notificação do orçamento e retorna sua prévia")
     public BudgetNotificationResponse notifyBudget(@PathVariable UUID id) {
         return WebDtoMapper.toResponse(notifyBudget.notifyBudget(id));
     }

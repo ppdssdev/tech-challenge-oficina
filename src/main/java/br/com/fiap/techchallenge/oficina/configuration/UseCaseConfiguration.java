@@ -15,12 +15,14 @@ import br.com.fiap.techchallenge.oficina.application.port.in.ManagePartsUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageServiceCatalogUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageVehiclesUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.NotifyBudgetUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.ProcessNotificationOutboxUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.StartDiagnosisUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.UpdateDiagnosisUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.out.CredentialVerifierPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.CustomerRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.PartRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.NotificationPort;
+import br.com.fiap.techchallenge.oficina.application.port.out.NotificationOutboxPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.ServiceCatalogRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.TokenIssuerPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.TransactionPort;
@@ -41,6 +43,7 @@ import br.com.fiap.techchallenge.oficina.application.usecase.ManagePartsService;
 import br.com.fiap.techchallenge.oficina.application.usecase.ManageServiceCatalogService;
 import br.com.fiap.techchallenge.oficina.application.usecase.ManageVehiclesService;
 import br.com.fiap.techchallenge.oficina.application.usecase.NotifyBudgetService;
+import br.com.fiap.techchallenge.oficina.application.usecase.ProcessNotificationOutboxService;
 import br.com.fiap.techchallenge.oficina.application.usecase.StartDiagnosisService;
 import br.com.fiap.techchallenge.oficina.application.usecase.UpdateDiagnosisService;
 import org.springframework.context.annotation.Bean;
@@ -106,11 +109,19 @@ public class UseCaseConfiguration {
 
     @Bean NotifyBudgetUseCase notifyBudget(
         WorkOrderRepositoryPort orders,
-        NotificationPort notifications,
+        NotificationOutboxPort outbox,
         TransactionPort tx,
         @Value("${app.public-base-url}") String publicBaseUrl
     ) {
-        return new NotifyBudgetService(orders, notifications, tx, publicBaseUrl);
+        return new NotifyBudgetService(orders, outbox, tx, publicBaseUrl);
+    }
+
+    @Bean ProcessNotificationOutboxUseCase processNotificationOutbox(
+        NotificationOutboxPort outbox,
+        NotificationPort notifications,
+        @Value("${app.notification.outbox.batch-size:10}") int batchSize
+    ) {
+        return new ProcessNotificationOutboxService(outbox, notifications, batchSize);
     }
 
     @Bean FinishWorkOrderUseCase finishWorkOrder(WorkOrderRepositoryPort orders, TransactionPort tx) {

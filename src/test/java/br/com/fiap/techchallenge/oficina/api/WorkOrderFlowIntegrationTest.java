@@ -151,7 +151,7 @@ class WorkOrderFlowIntegrationTest {
             "/api/v1/admin/work-orders/" + orderId + "/budget/notify", adminHeaders
         );
         assertThat(notification.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(requiredValue(notification, "channel")).isEqualTo("SIMULATED_EMAIL");
+        assertThat(requiredValue(notification, "channel")).isEqualTo("MAILPIT_EMAIL");
         assertThat(requiredValue(notification, "recipient")).isEqualTo("maria@email.com");
         assertThat(requiredValue(notification, "subject").toString()).contains(code);
         assertThat(requiredValue(notification, "body").toString())
@@ -182,6 +182,18 @@ class WorkOrderFlowIntegrationTest {
     void shouldRequireJwtToNotifyBudget() {
         ResponseEntity<String> response = restTemplate.exchange(
             url("/api/v1/admin/work-orders/" + UUID.randomUUID() + "/budget/notify"),
+            HttpMethod.POST,
+            HttpEntity.EMPTY,
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void shouldRequireJwtToProcessNotificationOutbox() {
+        ResponseEntity<String> response = restTemplate.exchange(
+            url("/api/v1/admin/notifications/outbox/process"),
             HttpMethod.POST,
             HttpEntity.EMPTY,
             String.class

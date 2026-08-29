@@ -12,6 +12,9 @@ spring:
     enabled: false
 
 app:
+  notification:
+    outbox:
+      enabled: false
   jwt:
     secret: test-secret-with-at-least-32-bytes-123456789
     expiration-minutes: 120

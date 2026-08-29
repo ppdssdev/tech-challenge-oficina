@@ -19,6 +19,7 @@ import br.com.fiap.techchallenge.oficina.application.port.in.ManagePartsUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageServiceCatalogUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageVehiclesUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.NotifyBudgetUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.ProcessNotificationOutboxUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.StartDiagnosisUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.UpdateDiagnosisUseCase;
 import java.lang.reflect.ParameterizedType;
@@ -68,6 +69,7 @@ class ApplicationBoundaryTest {
             ManageServiceCatalogUseCase.class,
             ManageVehiclesUseCase.class,
             NotifyBudgetUseCase.class,
+            ProcessNotificationOutboxUseCase.class,
             StartDiagnosisUseCase.class,
             UpdateDiagnosisUseCase.class
         );

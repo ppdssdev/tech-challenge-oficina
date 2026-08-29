@@ -2,7 +2,7 @@
 
 MVP de back-end para uma oficina mecânica de médio porte, com foco em gestão de clientes, veículos, serviços, peças/insumos, estoque e ordens de serviço.
 
-O projeto foi construído como **monólito Spring Boot em camadas**, usando **DDD pragmático** para concentrar as principais regras no domínio, principalmente no agregado `WorkOrder`.
+O projeto foi construído como **monólito Spring Boot com arquitetura hexagonal**, usando **DDD pragmático** para concentrar as principais regras no domínio, principalmente no agregado `WorkOrder`.
 
 ---
 
@@ -12,12 +12,14 @@ O projeto foi construído como **monólito Spring Boot em camadas**, usando **DD
 - Spring Boot 3.5.14
 - Spring Web
 - Spring Data JPA
+- Spring Mail
 - Spring Security
 - JWT
 - PostgreSQL
 - Flyway
 - Swagger/OpenAPI
 - Docker e Docker Compose
+- Mailpit para SMTP e caixa de e-mail locais
 - JUnit 5
 - JaCoCo
 - H2 para testes automatizados
@@ -49,7 +51,7 @@ A escolha é coerente com o domínio porque o sistema precisa de:
 - Inclusão de peças e insumos necessários.
 - Orçamento calculado automaticamente.
 - Status automático para `WAITING_APPROVAL` quando existe orçamento.
-- Prévia local de notificação do orçamento por e-mail simulado, sem provedor externo.
+- Notificação de orçamento persistida em outbox e enviada ao Mailpit, sem provedor externo pago.
 - Aprovação ou recusa externa do orçamento pelo cliente.
 - Baixa de estoque das peças somente no momento da aprovação.
 - Finalização da OS.
@@ -99,28 +101,26 @@ A escolha é coerente com o domínio porque o sistema precisa de:
 
 ```text
 src/main/java/br/com/fiap/techchallenge/oficina
-├── api
-│   ├── controller
-│   └── dto
+├── adapters
+│   ├── in/web
+│   └── out/{notification,persistence,security}
 ├── application
-│   └── service
-├── config
-├── domain
-│   ├── exception
-│   ├── model
-│   └── service
-├── infrastructure
-│   └── repository
-└── security
+│   ├── port/{in,out}
+│   └── usecase
+├── configuration
+└── domain
+    ├── exception
+    ├── model
+    └── service
 ```
 
 ### Camadas
 
-- `api`: entrada REST, DTOs e tratamento de erros.
-- `application`: orquestração dos casos de uso.
+- `adapters/in`: entrada REST, DTOs e tratamento de erros.
+- `application`: portas e orquestração dos casos de uso.
 - `domain`: entidades, estados, validações e regras de negócio.
-- `infrastructure`: persistência com Spring Data JPA.
-- `security`: JWT, autenticação e filtro de segurança.
+- `adapters/out`: persistência com JPA, envio SMTP local e segurança.
+- `configuration`: composição dos casos de uso e configuração Spring.
 
 ### DDD no projeto
 
@@ -158,9 +158,11 @@ docker compose up --build
 Para rodar em segundo plano:
 
 ```bash
-docker compose up --build -d
+docker compose up -d
 docker compose logs -f api
 ```
+
+A caixa de e-mail local do Mailpit fica em `http://localhost:8025`; o SMTP local escuta em `localhost:1025`. Todo o fluxo usa ferramentas gratuitas e locais, sem SendGrid, Twilio, SES ou outro serviço externo pago.
 
 Se já existir um banco local com migrations antigas e o Flyway acusar erro de checksum, zere o ambiente local de teste:
 
@@ -269,12 +271,13 @@ Depois execute, nesta ordem:
 
 ```http
 POST /api/v1/admin/work-orders/{id}/budget/notify
-POST /api/v1/admin/work-orders/{id}/approve
+POST /api/v1/admin/notifications/outbox/process
+POST /api/v1/public/work-orders/{code}/budget/approve
 POST /api/v1/admin/work-orders/{id}/finish
 POST /api/v1/admin/work-orders/{id}/deliver
 ```
 
-O endpoint de notificação é opcional e não altera o status. Ele retorna a prévia do e-mail simulado com os links públicos para o cliente decidir o orçamento. O endpoint administrativo de aprovação continua disponível para o atendente.
+O endpoint de notificação não altera o status da OS. Ele grava uma mensagem `PENDING` na outbox e retorna a prévia com os links públicos. O scheduler processa a fila automaticamente; o endpoint administrativo permite dispará-la manualmente na demonstração. Após o envio, o e-mail aparece no Mailpit e a mensagem passa a `SENT`; uma falha isolada vira `FAILED`, registra `attempts` e `lastError` e não interrompe o restante do lote.
 
 O endpoint `POST /api/v1/admin/work-orders/{id}/diagnosis/start` é usado para OS em `RECEIVED`. No fluxo acima, a OS já vai para `WAITING_APPROVAL`; se chamar diagnóstico nesse estado, a API retorna `422 Unprocessable Entity`, porque viola a transição permitida do domínio.
 
@@ -356,6 +359,13 @@ O PostgreSQL ficará disponível em:
 localhost:5432
 ```
 
+O Mailpit ficará disponível em:
+
+```text
+UI:   http://localhost:8025
+SMTP: localhost:1025
+```
+
 Credenciais do banco:
 
 ```text
@@ -376,10 +386,10 @@ password: oficina
 
 ### Aplicação fora do Docker
 
-Suba apenas o PostgreSQL:
+Suba PostgreSQL e Mailpit:
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres mailpit
 ```
 
 Depois execute a aplicação pela IDE ou via Maven:
@@ -406,11 +416,13 @@ APP_ADMIN_DEFAULT_USERNAME
 APP_ADMIN_DEFAULT_PASSWORD
 ```
 
-A URL base usada nos links da notificação simulada é `http://localhost:8080` por padrão e pode ser alterada por:
+A URL base usada nos links da notificação é `http://localhost:8080` por padrão e pode ser alterada por:
 
 ```text
 APP_PUBLIC_BASE_URL
 ```
+
+O processamento da outbox e o remetente local podem ser configurados por `APP_NOTIFICATION_OUTBOX_ENABLED`, `APP_NOTIFICATION_OUTBOX_POLL_DELAY_MS`, `APP_NOTIFICATION_OUTBOX_BATCH_SIZE` e `APP_NOTIFICATION_EMAIL_FROM`.
 
 ---
 
@@ -557,6 +569,7 @@ POST /api/v1/admin/work-orders/{id}/diagnosis/start
 POST /api/v1/admin/work-orders/{id}/diagnosis/notes
 POST /api/v1/admin/work-orders/{id}/items
 POST /api/v1/admin/work-orders/{id}/budget/notify
+POST /api/v1/admin/notifications/outbox/process
 POST /api/v1/admin/work-orders/{id}/approve
 POST /api/v1/admin/work-orders/{id}/finish
 POST /api/v1/admin/work-orders/{id}/deliver
@@ -574,22 +587,30 @@ POST /api/v1/public/work-orders/{code}/budget/reject
 
 A aprovação move a OS para `IN_EXECUTION`; a recusa move o orçamento inicial para `BUDGET_REJECTED`. Os status `FINALIZED` e `DELIVERED` continuam reservados, respectivamente, à finalização técnica e à entrega do veículo.
 
-### Notificação simulada do orçamento
+### Notificação local de orçamento com outbox e Mailpit
 
-O projeto não utiliza serviço pago, SMTP ou provedor externo de e-mail. Enquanto a OS estiver em `WAITING_APPROVAL`, o endpoint administrativo abaixo gera uma prévia local e registra a mensagem no log:
+O projeto não utiliza serviço pago nem provedor externo. Enquanto a OS estiver em `WAITING_APPROVAL`, o endpoint administrativo abaixo grava, na mesma transação da aplicação, a intenção de envio como `PENDING` na tabela `notification_outbox`:
 
 ```http
 POST /api/v1/admin/work-orders/{id}/budget/notify
 ```
 
-A resposta contém destinatário, assunto, corpo e os links `approveUrl` e `rejectUrl`. O cliente ainda precisa enviar seu CPF ou CNPJ no body ao chamar um desses endpoints `POST`. A notificação não altera o status da OS. Uma integração local real via Mailpit poderá substituir o adapter simulado posteriormente, preservando a mesma porta de saída.
+A resposta contém destinatário, assunto, corpo e os links `approveUrl` e `rejectUrl`. O cliente ainda precisa enviar seu CPF ou CNPJ no body ao chamar um desses endpoints `POST`. A notificação não altera o status da OS nem envia SMTP dentro da requisição. A outbox evita perder a intenção de notificação quando o SMTP está temporariamente indisponível.
+
+Um scheduler consulta mensagens pendentes a cada cinco segundos. Para processar imediatamente, use o endpoint protegido por JWT:
+
+```http
+POST /api/v1/admin/notifications/outbox/process
+```
+
+Depois, abra `http://localhost:8025`, selecione o e-mail e use os links públicos de aprovação ou recusa. O SMTP do Mailpit é totalmente local e não é necessário para `mvn clean verify`.
 
 Exemplo de resposta:
 
 ```json
 {
   "workOrderCode": "OS-20260829-ABC123",
-  "channel": "SIMULATED_EMAIL",
+  "channel": "MAILPIT_EMAIL",
   "recipient": "cliente@email.com",
   "subject": "Orçamento da OS OS-20260829-ABC123 aguardando aprovação",
   "body": "Olá, Maria Silva. O orçamento está aguardando decisão...",
@@ -681,43 +702,25 @@ curl -X POST http://localhost:8080/api/v1/admin/work-orders \
 
 A resposta retorna o `id` e o `code` da OS.
 
-### 3. Gerar notificação simulada do orçamento
+### 3. Enfileirar a notificação do orçamento
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/budget/notify \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-O retorno contém a prévia do e-mail e os links públicos de aprovação e recusa.
+O retorno contém a prévia do e-mail e os links públicos de aprovação e recusa. A mensagem fica `PENDING` na outbox.
 
-### 4. Aprovar orçamento administrativamente
+### 4. Processar a outbox imediatamente
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/approve \
+curl -X POST http://localhost:8080/api/v1/admin/notifications/outbox/process \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### 5. Finalizar OS
+Resposta esperada para uma mensagem pendente: `{"processed":1,"sent":1,"failed":0}`. O e-mail pode ser visto em `http://localhost:8025`.
 
-```bash
-curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/finish \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### 6. Entregar OS
-
-```bash
-curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/deliver \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### 7. Consulta pública do cliente
-
-```bash
-curl "http://localhost:8080/api/v1/public/work-orders/{code}/status?document=52998224725"
-```
-
-Para aprovar ou recusar o orçamento sem JWT:
+### 5. Aprovar ou recusar pelo link público
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/public/work-orders/{code}/budget/approve \
@@ -727,6 +730,26 @@ curl -X POST http://localhost:8080/api/v1/public/work-orders/{code}/budget/appro
 curl -X POST http://localhost:8080/api/v1/public/work-orders/{code}/budget/reject \
   -H "Content-Type: application/json" \
   -d '{"document":"52998224725"}'
+```
+
+### 6. Finalizar OS
+
+```bash
+curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/finish \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### 7. Entregar OS
+
+```bash
+curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/deliver \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### 8. Consulta pública do cliente
+
+```bash
+curl "http://localhost:8080/api/v1/public/work-orders/{code}/status?document=52998224725"
 ```
 
 ---
@@ -753,7 +776,8 @@ Peças:
 
 ## Observações sobre o MVP
 
-- Não há envio real de e-mail: o adapter local gera a prévia, registra a mensagem no log e retorna seu conteúdo. Mailpit/outbox ficam para uma etapa posterior.
+- O envio de e-mail é local: a outbox persiste a intenção e o adapter SMTP entrega ao Mailpit. Não há dependência de serviço externo pago.
+- O processamento é deliberadamente simples: sem retry avançado, DLQ, lock distribuído, Kafka ou RabbitMQ; falhas são marcadas como `FAILED`.
 - Não há módulo financeiro completo. O foco está em orçamento, autorização, execução e controle de estoque.
 - A baixa de estoque acontece na aprovação do orçamento, não na criação da OS.
 - O endpoint público exige documento do cliente para evitar consulta aberta apenas pelo código da OS.

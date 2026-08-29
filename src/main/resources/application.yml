@@ -19,6 +19,17 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+  mail:
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
+    username:
+    password:
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
   jackson:
     default-property-inclusion: non_null
 
@@ -38,6 +49,13 @@ management:
 
 app:
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
+  notification:
+    outbox:
+      enabled: ${APP_NOTIFICATION_OUTBOX_ENABLED:true}
+      poll-delay-ms: ${APP_NOTIFICATION_OUTBOX_POLL_DELAY_MS:5000}
+      batch-size: ${APP_NOTIFICATION_OUTBOX_BATCH_SIZE:10}
+    email:
+      from: ${APP_NOTIFICATION_EMAIL_FROM:oficina@local.test}
   jwt:
     secret: ${APP_JWT_SECRET:awssecretpostech-oficina-fiap-2026}
     expiration-minutes: ${APP_JWT_EXPIRATION_MINUTES:120}

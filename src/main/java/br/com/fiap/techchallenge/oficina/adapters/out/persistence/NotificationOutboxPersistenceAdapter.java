@@ -1,0 +1,74 @@
+package br.com.fiap.techchallenge.oficina.adapters.out.persistence;
+
+import br.com.fiap.techchallenge.oficina.adapters.out.persistence.entity.NotificationOutboxJpaEntity;
+import br.com.fiap.techchallenge.oficina.adapters.out.persistence.repository.SpringDataNotificationOutboxRepository;
+import br.com.fiap.techchallenge.oficina.application.port.out.NotificationOutboxPort;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Component;
+
+@Component
+public class NotificationOutboxPersistenceAdapter implements NotificationOutboxPort {
+    private final SpringDataNotificationOutboxRepository repository;
+
+    public NotificationOutboxPersistenceAdapter(SpringDataNotificationOutboxRepository repository) {
+        this.repository = repository;
+    }
+
+    @Override
+    public NotificationOutboxMessage enqueueBudgetDecision(NotificationOutboxMessage message) {
+        var entity = new NotificationOutboxJpaEntity();
+        entity.setId(message.id());
+        entity.setType(Type.BUDGET_DECISION);
+        entity.setChannel(Channel.MAILPIT_EMAIL);
+        entity.setStatus(Status.PENDING);
+        entity.setRecipient(message.recipient());
+        entity.setSubject(message.subject());
+        entity.setBody(message.body());
+        entity.setWorkOrderCode(message.workOrderCode());
+        entity.setApproveUrl(message.approveUrl());
+        entity.setRejectUrl(message.rejectUrl());
+        entity.setAttempts(0);
+        return toMessage(repository.save(entity));
+    }
+
+    @Override
+    public List<NotificationOutboxMessage> findPending(int limit) {
+        return repository.findByStatusOrderByCreatedAtAsc(Status.PENDING, PageRequest.of(0, limit))
+            .stream().map(NotificationOutboxPersistenceAdapter::toMessage).toList();
+    }
+
+    @Override
+    public void markSent(UUID id) {
+        var entity = required(id);
+        entity.setStatus(Status.SENT);
+        entity.setSentAt(OffsetDateTime.now());
+        entity.setLastError(null);
+        repository.save(entity);
+    }
+
+    @Override
+    public void markFailed(UUID id, String errorMessage) {
+        var entity = required(id);
+        entity.setStatus(Status.FAILED);
+        entity.setAttempts(entity.getAttempts() + 1);
+        entity.setLastError(errorMessage);
+        repository.save(entity);
+    }
+
+    private NotificationOutboxJpaEntity required(UUID id) {
+        return repository.findById(id)
+            .orElseThrow(() -> new IllegalStateException("Mensagem da outbox não encontrada: " + id));
+    }
+
+    private static NotificationOutboxMessage toMessage(NotificationOutboxJpaEntity entity) {
+        return new NotificationOutboxMessage(
+            entity.getId(), entity.getType(), entity.getChannel(), entity.getStatus(),
+            entity.getRecipient(), entity.getSubject(), entity.getBody(), entity.getWorkOrderCode(),
+            entity.getApproveUrl(), entity.getRejectUrl(), entity.getAttempts(), entity.getLastError(),
+            entity.getCreatedAt(), entity.getUpdatedAt(), entity.getSentAt()
+        );
+    }
+}

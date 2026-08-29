@@ -16,16 +16,27 @@ services:
       timeout: 5s
       retries: 5
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: oficina-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   api:
     build: .
     container_name: oficina-api
     depends_on:
       postgres:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/oficina_db
       SPRING_DATASOURCE_USERNAME: oficina
       SPRING_DATASOURCE_PASSWORD: oficina
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
       APP_ADMIN_DEFAULT_USERNAME: admin
       APP_ADMIN_DEFAULT_PASSWORD: admin123
       APP_JWT_SECRET: awssecretpostech-oficina-fiap-2026
