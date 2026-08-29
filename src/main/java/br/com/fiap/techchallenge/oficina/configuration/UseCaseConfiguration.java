@@ -7,6 +7,7 @@ import br.com.fiap.techchallenge.oficina.application.port.in.CreateWorkOrderUseC
 import br.com.fiap.techchallenge.oficina.application.port.in.DecideBudgetUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.DeliverWorkOrderUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.FinishWorkOrderUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.ExternalBudgetDecisionUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.GetWorkOrderUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ListWorkOrdersUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageCustomersUseCase;
@@ -30,6 +31,7 @@ import br.com.fiap.techchallenge.oficina.application.usecase.CreateWorkOrderServ
 import br.com.fiap.techchallenge.oficina.application.usecase.DecideBudgetService;
 import br.com.fiap.techchallenge.oficina.application.usecase.DeliverWorkOrderService;
 import br.com.fiap.techchallenge.oficina.application.usecase.FinishWorkOrderService;
+import br.com.fiap.techchallenge.oficina.application.usecase.ExternalBudgetDecisionService;
 import br.com.fiap.techchallenge.oficina.application.usecase.GetWorkOrderService;
 import br.com.fiap.techchallenge.oficina.application.usecase.ListWorkOrdersService;
 import br.com.fiap.techchallenge.oficina.application.usecase.ManageCustomersService;
@@ -90,6 +92,12 @@ public class UseCaseConfiguration {
 
     @Bean DecideBudgetUseCase decideBudget(WorkOrderRepositoryPort orders, PartRepositoryPort parts, TransactionPort tx) {
         return new DecideBudgetService(orders, parts, tx);
+    }
+
+    @Bean ExternalBudgetDecisionUseCase externalBudgetDecision(
+        WorkOrderRepositoryPort orders, PartRepositoryPort parts, TransactionPort tx
+    ) {
+        return new ExternalBudgetDecisionService(orders, parts, tx);
     }
 
     @Bean FinishWorkOrderUseCase finishWorkOrder(WorkOrderRepositoryPort orders, TransactionPort tx) {

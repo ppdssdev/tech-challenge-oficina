@@ -11,6 +11,7 @@ public interface ListWorkOrdersUseCase {
         IN_DIAGNOSIS,
         WAITING_APPROVAL,
         IN_EXECUTION,
+        BUDGET_REJECTED,
         FINALIZED,
         DELIVERED
     }

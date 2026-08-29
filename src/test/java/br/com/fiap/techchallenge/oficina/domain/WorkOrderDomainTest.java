@@ -52,6 +52,53 @@ class WorkOrderDomainTest {
     }
 
     @Test
+    void shouldRejectInitialBudgetWithoutReservingStockOrStartingExecution() {
+        var order = sampleOrder();
+        var part = new Part("Filtro", "FILTER-001", BigDecimal.valueOf(35), 5, 1);
+        order.addRequiredPart(part, 2);
+
+        order.rejectBudget();
+
+        assertThat(order.getStatus()).isEqualTo(WorkOrderStatus.BUDGET_REJECTED);
+        assertThat(part.getQuantityInStock()).isEqualTo(5);
+        assertThat(order.getPartItems().getFirst().isStockReserved()).isFalse();
+        assertThat(order.getStartedAt()).isNull();
+        assertThat(order.getFinishedAt()).isNull();
+        assertThat(order.getDeliveredAt()).isNull();
+    }
+
+    @Test
+    void shouldRejectBudgetRejectionWhenOrderIsNotWaitingForApproval() {
+        var order = sampleOrder();
+
+        assertThatThrownBy(order::rejectBudget)
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining("aguardando aprovação");
+
+        assertThat(order.getStatus()).isEqualTo(WorkOrderStatus.RECEIVED);
+    }
+
+    @Test
+    void shouldRejectAdditionalBudgetRejectionAfterExecutionHasStarted() {
+        var order = sampleOrder();
+        var service = new ServiceCatalogItem("Alinhamento", "Direção", BigDecimal.valueOf(150), 60);
+        var additionalPart = new Part("Filtro", "FILTER-001", BigDecimal.valueOf(35), 5, 1);
+        order.addRequestedService(service, 1);
+        order.approveBudget();
+        order.addRequiredPart(additionalPart, 2);
+
+        assertThat(order.getStatus()).isEqualTo(WorkOrderStatus.WAITING_APPROVAL);
+        assertThat(order.getStartedAt()).isNotNull();
+        assertThatThrownBy(order::rejectBudget)
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining("orçamento adicional em OS já iniciada");
+
+        assertThat(order.getStatus()).isEqualTo(WorkOrderStatus.WAITING_APPROVAL);
+        assertThat(additionalPart.getQuantityInStock()).isEqualTo(5);
+        assertThat(order.getPartItems().getFirst().isStockReserved()).isFalse();
+    }
+
+    @Test
     void shouldRequireApprovalAgainWhenAddingItemsDuringExecution() {
         var order = sampleOrder();
         var service = new ServiceCatalogItem("Troca de óleo", "Óleo", BigDecimal.valueOf(120), 40);

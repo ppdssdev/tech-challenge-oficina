@@ -5,6 +5,7 @@ public enum WorkOrderStatus {
     IN_DIAGNOSIS("Em diagnóstico"),
     WAITING_APPROVAL("Aguardando aprovação"),
     IN_EXECUTION("Em execução"),
+    BUDGET_REJECTED("Orçamento recusado"),
     FINALIZED("Finalizada"),
     DELIVERED("Entregue");
 

@@ -39,10 +39,11 @@ class ListWorkOrdersServiceTest {
         var execution = workOrder("OS-EXECUTION", WorkOrderStatus.IN_EXECUTION, baseDate.plusDays(3), null);
         var newerApproval = workOrder("OS-APPROVAL-NEWER", WorkOrderStatus.WAITING_APPROVAL, baseDate.plusDays(4), null);
         var olderApproval = workOrder("OS-APPROVAL-OLDER", WorkOrderStatus.WAITING_APPROVAL, baseDate, null);
+        var rejected = workOrder("OS-REJECTED", WorkOrderStatus.BUDGET_REJECTED, baseDate.minusDays(3), null);
         var finalized = workOrder("OS-FINALIZED", WorkOrderStatus.FINALIZED, baseDate.minusDays(1), null);
         var delivered = workOrder("OS-DELIVERED", WorkOrderStatus.DELIVERED, baseDate.minusDays(2), null);
         when(workOrderRepository.findAll()).thenReturn(List.of(
-            received, finalized, diagnosis, newerApproval, delivered, execution, olderApproval
+            received, finalized, diagnosis, newerApproval, rejected, delivered, execution, olderApproval
         ));
         var useCase = new ListWorkOrdersService(workOrderRepository, transactions);
 
@@ -103,6 +104,20 @@ class ListWorkOrdersServiceTest {
         assertThat(result).extracting(summary -> summary.status())
             .containsExactly(WorkOrderStatus.DELIVERED);
         verify(workOrderRepository).findByStatus(WorkOrderStatus.DELIVERED);
+        verify(workOrderRepository, never()).findAll();
+    }
+
+    @Test
+    void shouldRespectExplicitBudgetRejectedStatusFilter() {
+        var rejected = workOrder("OS-REJECTED", WorkOrderStatus.BUDGET_REJECTED, OffsetDateTime.now(), null);
+        when(workOrderRepository.findByStatus(WorkOrderStatus.BUDGET_REJECTED)).thenReturn(List.of(rejected));
+        var useCase = new ListWorkOrdersService(workOrderRepository, transactions);
+
+        var result = useCase.list(StatusFilter.BUDGET_REJECTED);
+
+        assertThat(result).extracting(summary -> summary.status())
+            .containsExactly(WorkOrderStatus.BUDGET_REJECTED);
+        verify(workOrderRepository).findByStatus(WorkOrderStatus.BUDGET_REJECTED);
         verify(workOrderRepository, never()).findAll();
     }
 

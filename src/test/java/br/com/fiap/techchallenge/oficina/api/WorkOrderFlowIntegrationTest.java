@@ -136,6 +136,69 @@ class WorkOrderFlowIntegrationTest {
         assertThat(requiredValue(part, "quantityInStock")).isEqualTo(0);
     }
 
+    @Test
+    void shouldApproveBudgetThroughPublicEndpointWithoutJwt() {
+        String token = login();
+        HttpHeaders adminHeaders = adminHeaders(token);
+        UUID serviceId = createService(adminHeaders);
+        UUID partId = createPart(adminHeaders);
+        ResponseEntity<Map<String, Object>> created = createOrder(adminHeaders, serviceId, partId);
+        String code = requiredValue(created, "code").toString();
+
+        ResponseEntity<Map<String, Object>> approved = postPublicBudgetDecision(
+            "/api/v1/public/work-orders/" + code + "/budget/approve",
+            Map.of("document", "529.982.247-25")
+        );
+
+        assertThat(approved.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(requiredValue(approved, "status")).isEqualTo("IN_EXECUTION");
+    }
+
+    @Test
+    void shouldRejectBudgetThroughPublicEndpointWithoutJwt() {
+        String token = login();
+        HttpHeaders adminHeaders = adminHeaders(token);
+        UUID serviceId = createService(adminHeaders);
+        UUID partId = createPart(adminHeaders);
+        ResponseEntity<Map<String, Object>> created = createOrder(adminHeaders, serviceId, partId);
+        String code = requiredValue(created, "code").toString();
+
+        ResponseEntity<Map<String, Object>> rejected = postPublicBudgetDecision(
+            "/api/v1/public/work-orders/" + code + "/budget/reject",
+            Map.of("document", "52998224725")
+        );
+
+        assertThat(rejected.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(requiredValue(rejected, "status")).isEqualTo("BUDGET_REJECTED");
+    }
+
+    @Test
+    void shouldHideBudgetDecisionForDifferentDocument() {
+        String token = login();
+        HttpHeaders adminHeaders = adminHeaders(token);
+        UUID serviceId = createService(adminHeaders);
+        UUID partId = createPart(adminHeaders);
+        ResponseEntity<Map<String, Object>> created = createOrder(adminHeaders, serviceId, partId);
+        String code = requiredValue(created, "code").toString();
+
+        ResponseEntity<Map<String, Object>> response = postPublicBudgetDecision(
+            "/api/v1/public/work-orders/" + code + "/budget/approve",
+            Map.of("document", "00000000000")
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void shouldRejectPublicBudgetDecisionPayloadWithoutDocument() {
+        ResponseEntity<Map<String, Object>> response = postPublicBudgetDecision(
+            "/api/v1/public/work-orders/OS-INEXISTENTE/budget/approve",
+            Map.of()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
     private String login() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -215,6 +278,17 @@ class WorkOrderFlowIntegrationTest {
 
     private ResponseEntity<Map<String, Object>> postWithoutBody(String path, HttpHeaders headers) {
         return restTemplate.exchange(url(path), HttpMethod.POST, new HttpEntity<>(headers), JSON_OBJECT);
+    }
+
+    private ResponseEntity<Map<String, Object>> postPublicBudgetDecision(
+        String path,
+        Map<String, Object> payload
+    ) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return restTemplate.exchange(
+            url(path), HttpMethod.POST, new HttpEntity<>(payload, headers), JSON_OBJECT
+        );
     }
 
     private HttpHeaders adminHeaders(String token) {

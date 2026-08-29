@@ -1,6 +1,7 @@
 package br.com.fiap.techchallenge.oficina.architecture;
 
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.AddWorkOrderItemsRequest;
+import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.BudgetDecisionRequest;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.RequestedPartInput;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.RequestedServiceInput;
 import br.com.fiap.techchallenge.oficina.application.port.in.AddWorkOrderItemsUseCase;
@@ -10,6 +11,7 @@ import br.com.fiap.techchallenge.oficina.application.port.in.CreateWorkOrderUseC
 import br.com.fiap.techchallenge.oficina.application.port.in.DecideBudgetUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.DeliverWorkOrderUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.FinishWorkOrderUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.ExternalBudgetDecisionUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.GetWorkOrderUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ListWorkOrdersUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageCustomersUseCase;
@@ -43,6 +45,7 @@ class ApplicationBoundaryTest {
     @Test
     void httpItemRequestsShouldNotImplementApplicationCommands() {
         assertThat(AddWorkOrderItemsRequest.class.getInterfaces()).isEmpty();
+        assertThat(BudgetDecisionRequest.class.getInterfaces()).isEmpty();
         assertThat(RequestedServiceInput.class.getInterfaces()).isEmpty();
         assertThat(RequestedPartInput.class.getInterfaces()).isEmpty();
     }
@@ -55,6 +58,7 @@ class ApplicationBoundaryTest {
             CreateWorkOrderUseCase.class,
             DecideBudgetUseCase.class,
             DeliverWorkOrderUseCase.class,
+            ExternalBudgetDecisionUseCase.class,
             FinishWorkOrderUseCase.class,
             GetWorkOrderUseCase.class,
             ListWorkOrdersUseCase.class,

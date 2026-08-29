@@ -10,6 +10,7 @@ import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.vehicle.VehicleRequ
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.vehicle.VehicleResponse;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.AddWorkOrderItemsRequest;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.AverageExecutionTimeResponse;
+import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.BudgetDecisionRequest;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.CreateWorkOrderRequest;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.PublicWorkOrderStatusResponse;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.WorkOrderPartItemResponse;
@@ -19,6 +20,7 @@ import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.workorder.WorkOrder
 import br.com.fiap.techchallenge.oficina.application.port.in.AddWorkOrderItemsUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.CalculateWorkOrderMetricsUseCase.ExecutionTimeMetrics;
 import br.com.fiap.techchallenge.oficina.application.port.in.CreateWorkOrderUseCase;
+import br.com.fiap.techchallenge.oficina.application.port.in.ExternalBudgetDecisionUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageCustomersUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManagePartsUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.ManageServiceCatalogUseCase;
@@ -117,6 +119,13 @@ public final class WebDtoMapper {
                 .map(item -> new AddWorkOrderItemsUseCase.PartItem(item.partId(), item.quantity()))
                 .toList();
         return new AddWorkOrderItemsUseCase.Command(services, parts);
+    }
+
+    public static ExternalBudgetDecisionUseCase.Command toCommand(
+        String code,
+        BudgetDecisionRequest request
+    ) {
+        return new ExternalBudgetDecisionUseCase.Command(code, request.document());
     }
 
     public static WorkOrderResponse toResponse(WorkOrderResult order) {

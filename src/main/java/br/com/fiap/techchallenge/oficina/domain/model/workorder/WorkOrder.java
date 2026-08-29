@@ -152,6 +152,16 @@ public class WorkOrder extends BaseEntity {
         }
     }
 
+    public void rejectBudget() {
+        if (status != WorkOrderStatus.WAITING_APPROVAL) {
+            throw new BusinessException("Somente OS aguardando aprovação pode ter o orçamento recusado.");
+        }
+        if (startedAt != null) {
+            throw new BusinessException("Recusa de orçamento adicional em OS já iniciada não é suportada nesta etapa.");
+        }
+        this.status = WorkOrderStatus.BUDGET_REJECTED;
+    }
+
     public void finish() {
         if (status != WorkOrderStatus.IN_EXECUTION) {
             throw new BusinessException("Somente OS em execução pode ser finalizada.");
@@ -200,6 +210,9 @@ public class WorkOrder extends BaseEntity {
     }
 
     private void ensureCanChangeBudget() {
+        if (status == WorkOrderStatus.BUDGET_REJECTED) {
+            throw new BusinessException("Não é possível alterar orçamento de OS com orçamento recusado.");
+        }
         if (status == WorkOrderStatus.FINALIZED || status == WorkOrderStatus.DELIVERED) {
             throw new BusinessException("Não é possível alterar orçamento de OS finalizada ou entregue.");
         }

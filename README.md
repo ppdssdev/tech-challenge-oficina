@@ -49,7 +49,7 @@ A escolha é coerente com o domínio porque o sistema precisa de:
 - Inclusão de peças e insumos necessários.
 - Orçamento calculado automaticamente.
 - Status automático para `WAITING_APPROVAL` quando existe orçamento.
-- Aprovação do orçamento.
+- Aprovação ou recusa externa do orçamento pelo cliente.
 - Baixa de estoque das peças somente no momento da aprovação.
 - Finalização da OS.
 - Entrega da OS.
@@ -61,6 +61,7 @@ A escolha é coerente com o domínio porque o sistema precisa de:
 - `IN_DIAGNOSIS` — Em diagnóstico
 - `WAITING_APPROVAL` — Aguardando aprovação
 - `IN_EXECUTION` — Em execução
+- `BUDGET_REJECTED` — Orçamento recusado
 - `FINALIZED` — Finalizada
 - `DELIVERED` — Entregue
 
@@ -280,6 +281,21 @@ GET /api/v1/public/work-orders/{code}/status?document=52998224725
 ```
 
 Esse endpoint é público, mas exige o documento do cliente para evitar consulta aberta somente pelo código da OS.
+
+O cliente também pode decidir o orçamento sem JWT, informando seu documento no corpo:
+
+```http
+POST /api/v1/public/work-orders/{code}/budget/approve
+POST /api/v1/public/work-orders/{code}/budget/reject
+```
+
+```json
+{
+  "document": "52998224725"
+}
+```
+
+A aprovação move a OS para `IN_EXECUTION` e reserva o estoque pendente. A recusa do orçamento inicial move a OS para `BUDGET_REJECTED`, sem iniciar a execução ou baixar estoque.
 
 ### 7. Consultar tempo médio de execução
 
@@ -520,7 +536,7 @@ DELETE /api/v1/admin/parts/{id}
 
 `GET /api/v1/admin/work-orders` sem o parâmetro `status` retorna a fila operacional da oficina. A fila contém somente OS nos status `RECEIVED`, `IN_DIAGNOSIS`, `WAITING_APPROVAL` e `IN_EXECUTION`, priorizadas nessa ordem de atendimento: `WAITING_APPROVAL`, `IN_EXECUTION`, `IN_DIAGNOSIS` e `RECEIVED`. Dentro do mesmo status, as OS mais antigas aparecem primeiro.
 
-OS nos status `FINALIZED` e `DELIVERED` não são exibidas na fila operacional padrão, mas continuam disponíveis por meio do filtro explícito, por exemplo `?status=FINALIZED` ou `?status=DELIVERED`.
+OS nos status `BUDGET_REJECTED`, `FINALIZED` e `DELIVERED` não são exibidas na fila operacional padrão, mas continuam disponíveis por meio do filtro explícito, por exemplo `?status=BUDGET_REJECTED`, `?status=FINALIZED` ou `?status=DELIVERED`.
 
 ```http
 POST /api/v1/admin/work-orders
@@ -537,9 +553,15 @@ POST /api/v1/admin/work-orders/{id}/deliver
 
 ### Consulta pública do cliente
 
+Os endpoints abaixo não exigem JWT. As decisões de orçamento exigem o documento do cliente no corpo da requisição para validar o acesso à OS.
+
 ```http
 GET /api/v1/public/work-orders/{code}/status?document=52998224725
+POST /api/v1/public/work-orders/{code}/budget/approve
+POST /api/v1/public/work-orders/{code}/budget/reject
 ```
+
+A aprovação move a OS para `IN_EXECUTION`; a recusa move o orçamento inicial para `BUDGET_REJECTED`. Os status `FINALIZED` e `DELIVERED` continuam reservados, respectivamente, à finalização técnica e à entrega do veículo.
 
 ### Métricas
 
@@ -649,6 +671,18 @@ curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/deliver \
 
 ```bash
 curl "http://localhost:8080/api/v1/public/work-orders/{code}/status?document=52998224725"
+```
+
+Para aprovar ou recusar o orçamento sem JWT:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/public/work-orders/{code}/budget/approve \
+  -H "Content-Type: application/json" \
+  -d '{"document":"52998224725"}'
+
+curl -X POST http://localhost:8080/api/v1/public/work-orders/{code}/budget/reject \
+  -H "Content-Type: application/json" \
+  -d '{"document":"52998224725"}'
 ```
 
 ---
