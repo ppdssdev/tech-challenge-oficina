@@ -1,3 +1,4 @@
+# Profile for fast tests that need an in-memory database.
 spring:
   datasource:
     url: jdbc:h2:mem:oficina;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH

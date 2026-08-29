@@ -1,0 +1,18 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+app:
+  notification:
+    outbox:
+      enabled: false
+  jwt:
+    secret: test-secret-with-at-least-32-bytes-123456789
+    expiration-minutes: 120
+  admin:
+    default-username: admin
+    default-password: admin123

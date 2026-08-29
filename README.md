@@ -22,7 +22,8 @@ O projeto foi construído como **monólito Spring Boot com arquitetura hexagonal
 - Mailpit para SMTP e caixa de e-mail locais
 - JUnit 5
 - JaCoCo
-- H2 para testes automatizados
+- H2 para testes rápidos de unidade/aplicação
+- Testcontainers com PostgreSQL 16 para testes de integração
 
 ---
 
@@ -449,6 +450,10 @@ Bearer SEU_TOKEN_AQUI
 
 ## Executar testes
 
+Os testes de domínio e aplicação continuam rápidos e isolados; quando precisam de banco em memória, usam o profile `test` com H2. Os testes REST e de persistência usam o profile `it`, sobem um PostgreSQL 16 real via Testcontainers, executam todas as migrations Flyway e validam os mapeamentos JPA com `ddl-auto=validate`.
+
+É necessário ter o Docker em execução para rodar a suíte completa. Se o daemon não estiver disponível, os testes que usam Testcontainers falharão.
+
 Executar todos os testes automatizados:
 
 ```bash
@@ -460,6 +465,8 @@ Executar testes, empacotamento e verificação de cobertura JaCoCo:
 ```bash
 mvn clean verify
 ```
+
+O Mailpit não é necessário para nenhum desses comandos. O envio de e-mail é validado com `JavaMailSender` mockado, e o scheduler da outbox fica desabilitado no profile `it`; o Mailpit é usado apenas na demonstração local com Docker Compose.
 
 Relatório JaCoCo:
 
@@ -489,7 +496,8 @@ Tipos de teste existentes:
 
 - domínio: regras puras de `WorkOrder`, `Part`, `Customer`, Value Objects e validators;
 - aplicação: serviços de aplicação com mocks para cenários de erro;
-- API: fluxo REST com Spring Boot, autenticação JWT e consulta pública;
+- API/integração: fluxo REST, autenticação JWT, consulta pública, PostgreSQL real, Flyway e JPA validate;
+- persistência: migrations, constraints e adapter da outbox contra PostgreSQL Testcontainers;
 - exceções: validação dos status HTTP esperados, como `401`, `403`, `404`, `409` e `422`.
 
 Status HTTP principais:
