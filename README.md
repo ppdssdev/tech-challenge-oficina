@@ -527,7 +527,38 @@ Ou:
 
 A exclusão do cluster remove também o volume local e os dados do PostgreSQL desse ambiente.
 
-Os valores de `k8s/local/secret.yaml` são credenciais previsíveis criadas exclusivamente para demonstração local. Eles não são secrets reais de produção. Em um ambiente real, os valores sensíveis devem ser gerenciados por uma solução apropriada, com acesso restrito e sem versionamento no repositório. Terraform e CI/CD não fazem parte desta etapa e serão tratados posteriormente.
+Os valores de `k8s/local/secret.yaml` são credenciais previsíveis criadas exclusivamente para demonstração local. Eles não são secrets reais de produção. Em um ambiente real, os valores sensíveis devem ser gerenciados por uma solução apropriada, com acesso restrito e sem versionamento no repositório. CI/CD será tratado posteriormente.
+
+---
+
+## Infraestrutura local com Terraform
+
+Além dos comandos diretos com Kind e `kubectl`, o projeto possui um fluxo Terraform opcional que cria o cluster, builda e carrega a imagem local e aplica a mesma base Kustomize. Ele mantém estado apenas local, não usa Terraform Cloud, AWS/EKS, Helm, registry externo ou ferramenta paga.
+
+Use apenas um fluxo para gerenciar o cluster `oficina-local`. Se ele foi criado pelos scripts do Kind, destrua-o antes do primeiro `terraform apply`.
+
+```bash
+cd infra/terraform/local
+terraform init
+terraform plan
+terraform apply
+export KUBECONFIG="$(terraform output -raw kubeconfig_path)"
+```
+
+Depois, os acessos continuam via port-forward:
+
+```bash
+kubectl -n oficina port-forward svc/oficina-api 8080:8080
+curl http://localhost:8080/actuator/health
+```
+
+Para remover os manifests e o cluster gerenciados pelo Terraform:
+
+```bash
+terraform destroy
+```
+
+O guia detalhado está em [Terraform local com Kind](infra/terraform/local/README.md). Quem preferir pode continuar usando os scripts diretos documentados nesta seção.
 
 ---
 

@@ -3,6 +3,18 @@ target/
 /out/
 build/
 
+# Terraform local state and working files
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
 # Maven
 .mvn/timing.properties
 
