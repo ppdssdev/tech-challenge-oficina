@@ -139,11 +139,15 @@ O projeto usa DDD de forma pragmática dentro de um monólito em camadas:
 
 ### Documentação técnica
 
-- [Arquitetura e DDD](docs/architecture.md)
-- [Checklist de requisitos](docs/requirements-checklist.md)
-- [Exemplos de chamadas HTTP](docs/api-examples.http)
+- [Roteiro 11 — documentação técnica final e defesa para a banca](docs/roteiro-11-documentacao-final.md)
+- [ADR 0001 — arquitetura hexagonal](docs/adr/0001-arquitetura-hexagonal.md)
+- [Diagramas da solução](docs/diagrams.pdf)
+- [Linguagem ubíqua](docs/linguagem-ubiqua.pdf)
+- [Event Storming](docs/Event%20Storming%20Oficina%20Mecanica.pdf)
+- [Roteiro original da apresentação](docs/roteiro-apresentacao.pdf)
 
-Os artefatos finais da fase, como PDF de entrega, board de Event Storming/Miro, roteiro do vídeo e relatório formal de vulnerabilidades, são preparados fora do repositório a partir destes documentos técnicos e dos resultados dos scans.
+O Roteiro 11 é a fonte atualizada para a documentação e a defesa final. Os PDFs
+existentes permanecem como artefatos da fase em que foram produzidos.
 
 ---
 
