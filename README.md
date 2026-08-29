@@ -579,7 +579,7 @@ Ou:
 
 A exclusão do cluster remove também o volume local e os dados do PostgreSQL desse ambiente.
 
-Os valores de `k8s/local/secret.yaml` são credenciais previsíveis criadas exclusivamente para demonstração local. Eles não são secrets reais de produção. Em um ambiente real, os valores sensíveis devem ser gerenciados por uma solução apropriada, com acesso restrito e sem versionamento no repositório. CI/CD será tratado posteriormente.
+Os valores de `k8s/local/secret.yaml` são credenciais previsíveis criadas exclusivamente para demonstração local. Eles não são secrets reais de produção. Em um ambiente real, os valores sensíveis devem ser gerenciados por uma solução apropriada, com acesso restrito e sem versionamento no repositório.
 
 ---
 
@@ -611,6 +611,35 @@ terraform destroy
 ```
 
 O guia detalhado está em [Terraform local com Kind](infra/terraform/local/README.md). Quem preferir pode continuar usando os scripts diretos documentados nesta seção.
+
+---
+
+## CI/CD com GitHub Actions
+
+O workflow [CI](.github/workflows/ci.yml) roda automaticamente em pushes e pull requests para a branch `main`. Os jobs separados tornam visíveis as validações de aplicação, imagem e infraestrutura:
+
+- executa `mvn -B clean verify`, incluindo os testes de integração com PostgreSQL via Testcontainers e a verificação de cobertura JaCoCo;
+- disponibiliza o relatório HTML do JaCoCo como artefato da execução, inclusive para facilitar o diagnóstico de uma falha;
+- builda e inspeciona a imagem Docker da API, sem publicá-la;
+- verifica a formatação, inicializa e valida o módulo Terraform local, sem executar `terraform apply`;
+- renderiza a base `k8s/local` com `kubectl kustomize` e confirma que o resultado não está vazio, sem aplicar recursos em um cluster.
+
+O workflow [Kind Smoke Test](.github/workflows/kind-smoke.yml) é iniciado manualmente pela opção **Run workflow** do GitHub Actions. Ele cria o cluster `oficina-local` no runner, builda e carrega a imagem diretamente no Kind, aplica `k8s/local`, aguarda os rollouts do PostgreSQL, Mailpit, API, Prometheus e Grafana e valida os endpoints `/actuator/health` e `/actuator/prometheus` por port-forward. Em caso de falha, coleta estado, descrição e logs dos pods; ao final, sempre remove o cluster.
+
+Esse pipeline simula uma entrega local e reprodutível. Não faz deploy em cloud, não usa serviço pago nem credenciais externas e não publica imagens no Docker Hub, GHCR ou outro registry.
+
+Comandos locais equivalentes ao CI principal:
+
+```bash
+mvn clean verify
+docker build -t tech-challenge-oficina:local .
+terraform -chdir=infra/terraform/local fmt -check -recursive
+terraform -chdir=infra/terraform/local init
+terraform -chdir=infra/terraform/local validate
+kubectl kustomize k8s/local
+```
+
+Os testes de integração dependem do daemon Docker para que o Testcontainers suba o PostgreSQL. O workflow não usa um PostgreSQL em `services`, não desabilita testes e não ignora falhas.
 
 ---
 
