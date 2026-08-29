@@ -518,6 +518,10 @@ DELETE /api/v1/admin/parts/{id}
 
 ### Ordens de Serviço
 
+`GET /api/v1/admin/work-orders` sem o parâmetro `status` retorna a fila operacional da oficina. A fila contém somente OS nos status `RECEIVED`, `IN_DIAGNOSIS`, `WAITING_APPROVAL` e `IN_EXECUTION`, priorizadas nessa ordem de atendimento: `WAITING_APPROVAL`, `IN_EXECUTION`, `IN_DIAGNOSIS` e `RECEIVED`. Dentro do mesmo status, as OS mais antigas aparecem primeiro.
+
+OS nos status `FINALIZED` e `DELIVERED` não são exibidas na fila operacional padrão, mas continuam disponíveis por meio do filtro explícito, por exemplo `?status=FINALIZED` ou `?status=DELIVERED`.
+
 ```http
 POST /api/v1/admin/work-orders
 GET  /api/v1/admin/work-orders
