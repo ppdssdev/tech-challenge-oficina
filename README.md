@@ -401,6 +401,136 @@ mvn spring-boot:run
 
 ---
 
+## Execução local com Kubernetes/Kind
+
+Esta opção executa gratuitamente a API, o PostgreSQL e o Mailpit dentro de um cluster Kubernetes local criado com Kind. Ela não usa EKS ou outro serviço de cloud, registry privado, Helm, Ingress ou `LoadBalancer`; os acessos locais são feitos com `port-forward`.
+
+### Pré-requisitos
+
+- Docker com o daemon em execução
+- `kubectl`
+- `kind`
+
+### 1. Criar o cluster
+
+O nome `oficina-local` é informado pela linha de comando; o arquivo de configuração mantém apenas a topologia de um nó para continuar compatível com o schema do Kind.
+
+```bash
+kind create cluster \
+  --name oficina-local \
+  --config k8s/kind/oficina-kind.yaml
+```
+
+O script equivalente é idempotente e não recria o cluster caso ele já exista:
+
+```bash
+./scripts/kind-create.sh
+```
+
+### 2. Buildar e carregar a imagem local
+
+Não é necessário publicar a imagem em um registry externo:
+
+```bash
+docker build -t tech-challenge-oficina:local .
+kind load docker-image tech-challenge-oficina:local --name oficina-local
+```
+
+Ou execute os dois comandos com:
+
+```bash
+./scripts/kind-load-image.sh
+```
+
+Sempre repita o build e o carregamento após alterar a aplicação. O Deployment usa `imagePullPolicy: IfNotPresent` para aproveitar a imagem carregada diretamente nos nós do Kind.
+
+### 3. Implantar os recursos
+
+```bash
+kubectl apply -k k8s/local
+kubectl -n oficina rollout status deployment/oficina-api --timeout=300s
+kubectl get pods -n oficina
+kubectl get svc -n oficina
+```
+
+O script de deploy também aguarda PostgreSQL e Mailpit antes de aguardar a API:
+
+```bash
+./scripts/k8s-deploy-local.sh
+```
+
+Todos os recursos ficam no namespace `oficina`. O PostgreSQL usa um PVC local e seu Service é somente `ClusterIP`, portanto o banco não é exposto fora do cluster.
+
+Para diagnóstico operacional:
+
+```bash
+kubectl -n oficina get pods,svc,pvc
+kubectl -n oficina describe pod -l app=oficina-api
+kubectl -n oficina logs deployment/oficina-api
+```
+
+### 4. Acessar e validar a API
+
+Em um terminal, mantenha o port-forward ativo:
+
+```bash
+kubectl -n oficina port-forward svc/oficina-api 8080:8080
+```
+
+Em outro terminal, valide o Actuator:
+
+```bash
+curl http://localhost:8080/actuator/health
+```
+
+Resposta esperada:
+
+```json
+{"status":"UP"}
+```
+
+Com o port-forward ativo, a API e o Swagger ficam disponíveis em:
+
+```text
+API:     http://localhost:8080
+Swagger: http://localhost:8080/swagger-ui/index.html
+```
+
+### 5. Acessar o Mailpit
+
+Em outro terminal, mantenha o port-forward da interface web ativo:
+
+```bash
+kubectl -n oficina port-forward svc/oficina-mailpit 8025:8025
+```
+
+Acesse `http://localhost:8025`. Dentro do cluster, a API envia os e-mails por `oficina-mailpit:1025`. Como `APP_PUBLIC_BASE_URL` vale `http://localhost:8080`, os links de aprovação ou recusa enviados por e-mail funcionam enquanto o port-forward da API estiver ativo.
+
+Para iniciar os dois port-forwards com um único comando e encerrá-los juntos com `Ctrl+C`:
+
+```bash
+./scripts/k8s-port-forward.sh
+```
+
+### 6. Destruir o ambiente
+
+```bash
+kubectl delete -k k8s/local
+kind delete cluster --name oficina-local
+```
+
+Ou:
+
+```bash
+./scripts/k8s-destroy-local.sh
+```
+
+A exclusão do cluster remove também o volume local e os dados do PostgreSQL desse ambiente.
+
+Os valores de `k8s/local/secret.yaml` são credenciais previsíveis criadas exclusivamente para demonstração local. Eles não são secrets reais de produção. Em um ambiente real, os valores sensíveis devem ser gerenciados por uma solução apropriada, com acesso restrito e sem versionamento no repositório. Terraform e CI/CD não fazem parte desta etapa e serão tratados posteriormente.
+
+---
+
 ## Login administrativo
 
 Ao iniciar a aplicação, um usuário administrativo padrão é criado automaticamente se ainda não existir.

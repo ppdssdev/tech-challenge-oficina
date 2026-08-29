@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oficina-api-config
+  namespace: oficina
+data:
+  SPRING_DATASOURCE_URL: jdbc:postgresql://oficina-postgres:5432/oficina_db
+  SPRING_DATASOURCE_USERNAME: oficina
+  SPRING_MAIL_HOST: oficina-mailpit
+  SPRING_MAIL_PORT: "1025"
+  APP_PUBLIC_BASE_URL: http://localhost:8080
+  APP_NOTIFICATION_OUTBOX_ENABLED: "true"
+  APP_NOTIFICATION_OUTBOX_POLL_DELAY_MS: "5000"
+  APP_NOTIFICATION_OUTBOX_BATCH_SIZE: "10"
+  APP_NOTIFICATION_EMAIL_FROM: oficina@local.test
+  APP_ADMIN_DEFAULT_USERNAME: admin
