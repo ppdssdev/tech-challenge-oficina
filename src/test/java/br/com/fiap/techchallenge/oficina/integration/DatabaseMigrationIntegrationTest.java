@@ -29,16 +29,22 @@ class DatabaseMigrationIntegrationTest extends PostgresIntegrationTestSupport {
             "select to_regclass('public.notification_outbox')::text",
             String.class
         );
+        String idempotencyTableName = jdbcTemplate.queryForObject(
+            "select to_regclass('public.idempotency_records')::text",
+            String.class
+        );
         String statusConstraint = jdbcTemplate.queryForObject("""
             select pg_get_constraintdef(oid)
               from pg_constraint
              where conname = 'chk_notification_outbox_status'
             """, String.class);
 
-        assertThat(successfulMigrations).isEqualTo(5);
+        assertThat(successfulMigrations).isEqualTo(7);
         assertThat(tableName).isEqualTo("notification_outbox");
+        assertThat(idempotencyTableName).isEqualTo("idempotency_records");
         assertThat(statusConstraint)
             .contains("PENDING")
+            .contains("PROCESSING")
             .contains("SENT")
             .contains("FAILED");
     }
@@ -56,14 +62,14 @@ class DatabaseMigrationIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Test
     void shouldEnforcePostgresOutboxStatusConstraint() {
-        for (String status : new String[] {"PENDING", "SENT", "FAILED"}) {
+        for (String status : new String[] {"PENDING", "PROCESSING", "SENT", "FAILED"}) {
             insertOutboxRow(status);
         }
 
         assertThat(jdbcTemplate.queryForObject(
             "select count(*) from notification_outbox",
             Integer.class
-        )).isEqualTo(3);
+        )).isEqualTo(4);
         assertThatThrownBy(() -> insertOutboxRow("UNKNOWN"))
             .isInstanceOf(DataIntegrityViolationException.class);
     }

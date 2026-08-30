@@ -10,6 +10,7 @@ public class NotificationOutboxMetrics {
 
     public NotificationOutboxMetrics(MeterRegistry meterRegistry, NotificationOutboxPort outbox) {
         registerGauge(meterRegistry, outbox, "pending", Status.PENDING);
+        registerGauge(meterRegistry, outbox, "processing", Status.PROCESSING);
         registerGauge(meterRegistry, outbox, "sent", Status.SENT);
         registerGauge(meterRegistry, outbox, "failed", Status.FAILED);
     }

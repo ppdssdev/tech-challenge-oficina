@@ -109,6 +109,16 @@ data:
           "targets": [{"expr": "oficina_notification_outbox_failed", "legendFormat": "falhas", "refId": "A"}],
           "title": "Outbox com falha",
           "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"min": 0, "unit": "short"}, "overrides": []},
+          "gridPos": {"h": 5, "w": 6, "x": 12, "y": 16},
+          "id": 8,
+          "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+          "targets": [{"expr": "oficina_notification_outbox_processing", "legendFormat": "em processamento", "refId": "A"}],
+          "title": "Outbox em processamento",
+          "type": "stat"
         }
       ],
       "refresh": "15s",

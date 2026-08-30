@@ -5,10 +5,18 @@ import br.com.fiap.techchallenge.oficina.application.port.out.NotificationOutbox
 import br.com.fiap.techchallenge.oficina.application.port.out.NotificationOutboxPort.NotificationOutboxMessage;
 import br.com.fiap.techchallenge.oficina.application.port.out.NotificationOutboxPort.Status;
 import br.com.fiap.techchallenge.oficina.application.port.out.NotificationOutboxPort.Type;
+import br.com.fiap.techchallenge.oficina.application.port.out.NotificationPort;
+import br.com.fiap.techchallenge.oficina.application.usecase.ProcessNotificationOutboxService;
 import br.com.fiap.techchallenge.oficina.support.PostgresIntegrationTestSupport;
 import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -47,6 +55,50 @@ class NotificationOutboxPersistenceIntegrationTest extends PostgresIntegrationTe
     }
 
     @Test
+    void shouldClaimPendingMessageAndNotReturnItToASecondClaim() {
+        NotificationOutboxMessage queued = notificationOutbox.enqueueBudgetDecision(message("OS-CLAIM"));
+
+        List<NotificationOutboxMessage> firstClaim = notificationOutbox.claimPending(
+            10, OffsetDateTime.now().minusMinutes(5)
+        );
+        List<NotificationOutboxMessage> secondClaim = notificationOutbox.claimPending(
+            10, OffsetDateTime.now().minusMinutes(5)
+        );
+
+        assertThat(firstClaim)
+            .singleElement()
+            .satisfies(claimed -> {
+                assertThat(claimed.id()).isEqualTo(queued.id());
+                assertThat(claimed.status()).isEqualTo(Status.PROCESSING);
+                assertThat(claimed.attempts()).isEqualTo(1);
+            });
+        assertThat(secondClaim).isEmpty();
+        assertThat(notificationOutbox.countByStatus(Status.PROCESSING)).isEqualTo(1);
+    }
+
+    @Test
+    void shouldRecoverStaleProcessingMessage() {
+        NotificationOutboxMessage queued = notificationOutbox.enqueueBudgetDecision(message("OS-STALE"));
+        notificationOutbox.claimPending(10, OffsetDateTime.now().minusMinutes(5));
+        jdbcTemplate.update(
+            "update notification_outbox set updated_at = now() - interval '10 minutes' where id = ?",
+            queued.id()
+        );
+
+        List<NotificationOutboxMessage> recovered = notificationOutbox.claimPending(
+            10, OffsetDateTime.now().minusMinutes(5)
+        );
+
+        assertThat(recovered)
+            .singleElement()
+            .satisfies(message -> {
+                assertThat(message.id()).isEqualTo(queued.id());
+                assertThat(message.status()).isEqualTo(Status.PROCESSING);
+                assertThat(message.attempts()).isEqualTo(2);
+            });
+    }
+
+    @Test
     void shouldMarkMessageAsSentAndFillSentAt() {
         NotificationOutboxMessage queued = notificationOutbox.enqueueBudgetDecision(message("OS-001"));
 
@@ -62,6 +114,7 @@ class NotificationOutboxPersistenceIntegrationTest extends PostgresIntegrationTe
     @Test
     void shouldMarkMessageAsFailedIncrementAttemptsAndRecordError() {
         NotificationOutboxMessage queued = notificationOutbox.enqueueBudgetDecision(message("OS-001"));
+        notificationOutbox.claimPending(10, OffsetDateTime.now().minusMinutes(5));
 
         notificationOutbox.markFailed(queued.id(), "SMTP indisponível");
 
@@ -70,6 +123,49 @@ class NotificationOutboxPersistenceIntegrationTest extends PostgresIntegrationTe
         assertThat(row.get("attempts")).isEqualTo(1);
         assertThat(row.get("last_error")).isEqualTo("SMTP indisponível");
         assertThat(notificationOutbox.findPending(10)).isEmpty();
+    }
+
+    @Test
+    void shouldReturnFailedMessageToPendingForAutomaticRetry() {
+        NotificationOutboxMessage queued = notificationOutbox.enqueueBudgetDecision(message("OS-RETRY"));
+        notificationOutbox.claimPending(10, OffsetDateTime.now().minusMinutes(5));
+
+        notificationOutbox.markPending(queued.id(), "SMTP indisponível");
+
+        Map<String, Object> row = findState(queued.id());
+        assertThat(row.get("status")).isEqualTo("PENDING");
+        assertThat(row.get("attempts")).isEqualTo(1);
+        assertThat(row.get("last_error")).isEqualTo("SMTP indisponível");
+    }
+
+    @Test
+    void shouldSendSingleMessageOnceWithTwoConcurrentProcessors() throws Exception {
+        notificationOutbox.enqueueBudgetDecision(message("OS-CONCURRENT"));
+        AtomicInteger sends = new AtomicInteger();
+        NotificationPort notification = ignored -> sends.incrementAndGet();
+        var firstProcessor = new ProcessNotificationOutboxService(
+            notificationOutbox, notification, 10, 3, 300
+        );
+        var secondProcessor = new ProcessNotificationOutboxService(
+            notificationOutbox, notification, 10, 3, 300
+        );
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            List<Callable<Integer>> tasks = List.of(
+                () -> firstProcessor.processPending().processed(),
+                () -> secondProcessor.processPending().processed()
+            );
+
+            var results = executor.invokeAll(tasks);
+
+            assertThat(results)
+                .extracting(future -> future.get(10, TimeUnit.SECONDS))
+                .containsExactlyInAnyOrder(0, 1);
+            assertThat(sends).hasValue(1);
+            assertThat(notificationOutbox.countByStatus(Status.SENT)).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test

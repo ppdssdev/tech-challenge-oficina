@@ -7,11 +7,13 @@ import java.util.UUID;
 public interface NotificationOutboxPort {
     NotificationOutboxMessage enqueueBudgetDecision(NotificationOutboxMessage message);
     List<NotificationOutboxMessage> findPending(int limit);
+    List<NotificationOutboxMessage> claimPending(int limit, OffsetDateTime staleBefore);
     long countByStatus(Status status);
     void markSent(UUID id);
+    void markPending(UUID id, String errorMessage);
     void markFailed(UUID id, String errorMessage);
 
-    enum Status { PENDING, SENT, FAILED }
+    enum Status { PENDING, PROCESSING, SENT, FAILED }
     enum Type { BUDGET_DECISION }
     enum Channel { MAILPIT_EMAIL }
 

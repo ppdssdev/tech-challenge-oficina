@@ -130,6 +130,14 @@ public final class WebDtoMapper {
         return new ExternalBudgetDecisionUseCase.Command(code, request.document());
     }
 
+    public static ExternalBudgetDecisionUseCase.Command toCommand(
+        String code,
+        BudgetDecisionRequest request,
+        String idempotencyKey
+    ) {
+        return new ExternalBudgetDecisionUseCase.Command(code, request.document(), idempotencyKey);
+    }
+
     public static WorkOrderResponse toResponse(WorkOrderResult order) {
         return new WorkOrderResponse(
             order.id(), order.code(), order.status(), order.statusLabel(),

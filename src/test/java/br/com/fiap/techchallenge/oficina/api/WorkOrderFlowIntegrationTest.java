@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -186,6 +189,83 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
+    void shouldApproveBudgetIdempotentlyAndRejectKeyReusedWithDifferentPayload() {
+        String token = login();
+        HttpHeaders adminHeaders = adminHeaders(token);
+        UUID serviceId = createService(adminHeaders);
+        UUID partId = createPart(adminHeaders);
+        ResponseEntity<Map<String, Object>> created = createOrder(adminHeaders, serviceId, partId);
+        String code = requiredValue(created, "code").toString();
+        String key = "approve-" + code + "-001";
+        String path = "/api/v1/public/work-orders/" + code + "/budget/approve";
+
+        ResponseEntity<Map<String, Object>> first = postPublicBudgetDecision(
+            path, Map.of("document", "529.982.247-25"), key
+        );
+        ResponseEntity<Map<String, Object>> retry = postPublicBudgetDecision(
+            path, Map.of("document", "52998224725"), key
+        );
+        ResponseEntity<Map<String, Object>> differentPayload = postPublicBudgetDecision(
+            "/api/v1/public/work-orders/" + code + "-DIFFERENT/budget/approve",
+            Map.of("document", "52998224725"), key
+        );
+        ResponseEntity<Map<String, Object>> retryWithoutKey = postPublicBudgetDecision(
+            path, Map.of("document", "52998224725")
+        );
+
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(retry.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(requiredValue(first, "status")).isEqualTo("IN_EXECUTION");
+        assertThat(requiredValue(retry, "status")).isEqualTo("IN_EXECUTION");
+        assertThat(differentPayload.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(requiredValue(differentPayload, "message"))
+            .isEqualTo("Idempotency-Key reutilizada com uma requisição diferente.");
+        assertThat(retryWithoutKey.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(jdbcTemplate.queryForObject(
+            "select quantity_in_stock from parts where id = ?", Integer.class, partId
+        )).isEqualTo(8);
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from idempotency_records where operation = 'PUBLIC_BUDGET_APPROVE' and idempotency_key = ? and status = 'COMPLETED'",
+            Integer.class,
+            key
+        )).isEqualTo(1);
+    }
+
+    @Test
+    void shouldNotDeductStockTwiceForConcurrentRequestsWithSameIdempotencyKey() throws Exception {
+        String token = login();
+        HttpHeaders adminHeaders = adminHeaders(token);
+        UUID serviceId = createService(adminHeaders);
+        UUID partId = createPart(adminHeaders);
+        ResponseEntity<Map<String, Object>> created = createOrder(adminHeaders, serviceId, partId);
+        String code = requiredValue(created, "code").toString();
+        String key = "concurrent-" + code;
+        String path = "/api/v1/public/work-orders/" + code + "/budget/approve";
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            Callable<ResponseEntity<Map<String, Object>>> approval = () -> postPublicBudgetDecision(
+                path, Map.of("document", "52998224725"), key
+            );
+
+            var responses = executor.invokeAll(List.of(approval, approval));
+
+            assertThat(responses)
+                .extracting(future -> future.get(10, TimeUnit.SECONDS).getStatusCode())
+                .containsOnly(HttpStatus.OK);
+            assertThat(jdbcTemplate.queryForObject(
+                "select quantity_in_stock from parts where id = ?", Integer.class, partId
+            )).isEqualTo(8);
+            assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from idempotency_records where idempotency_key = ?",
+                Integer.class,
+                key
+            )).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     void shouldRequireJwtToNotifyBudget() {
         ResponseEntity<String> response = restTemplate.exchange(
             url("/api/v1/admin/work-orders/" + UUID.randomUUID() + "/budget/notify"),
@@ -341,6 +421,19 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
     ) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        return restTemplate.exchange(
+            url(path), HttpMethod.POST, new HttpEntity<>(payload, headers), JSON_OBJECT
+        );
+    }
+
+    private ResponseEntity<Map<String, Object>> postPublicBudgetDecision(
+        String path,
+        Map<String, Object> payload,
+        String idempotencyKey
+    ) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Idempotency-Key", idempotencyKey);
         return restTemplate.exchange(
             url(path), HttpMethod.POST, new HttpEntity<>(payload, headers), JSON_OBJECT
         );

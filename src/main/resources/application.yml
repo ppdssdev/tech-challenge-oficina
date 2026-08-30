@@ -62,6 +62,8 @@ app:
       enabled: ${APP_NOTIFICATION_OUTBOX_ENABLED:true}
       poll-delay-ms: ${APP_NOTIFICATION_OUTBOX_POLL_DELAY_MS:5000}
       batch-size: ${APP_NOTIFICATION_OUTBOX_BATCH_SIZE:10}
+      max-attempts: ${APP_NOTIFICATION_OUTBOX_MAX_ATTEMPTS:3}
+      processing-timeout-seconds: ${APP_NOTIFICATION_OUTBOX_PROCESSING_TIMEOUT_SECONDS:300}
     email:
       from: ${APP_NOTIFICATION_EMAIL_FROM:oficina@local.test}
   jwt:

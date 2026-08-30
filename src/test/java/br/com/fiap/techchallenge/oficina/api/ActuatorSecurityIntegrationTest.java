@@ -34,6 +34,7 @@ class ActuatorSecurityIntegrationTest extends PostgresIntegrationTestSupport {
             .contains("jvm_memory_used_bytes")
             .contains("process_cpu_usage")
             .contains("oficina_notification_outbox_pending")
+            .contains("oficina_notification_outbox_processing")
             .contains("oficina_notification_outbox_failed");
     }
 

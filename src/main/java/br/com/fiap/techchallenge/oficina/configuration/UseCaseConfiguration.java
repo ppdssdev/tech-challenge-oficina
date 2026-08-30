@@ -19,6 +19,7 @@ import br.com.fiap.techchallenge.oficina.application.port.in.ProcessNotification
 import br.com.fiap.techchallenge.oficina.application.port.in.StartDiagnosisUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.UpdateDiagnosisUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.out.CredentialVerifierPort;
+import br.com.fiap.techchallenge.oficina.application.port.out.IdempotencyPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.CustomerRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.PartRepositoryPort;
 import br.com.fiap.techchallenge.oficina.application.port.out.NotificationPort;
@@ -102,9 +103,12 @@ public class UseCaseConfiguration {
     }
 
     @Bean ExternalBudgetDecisionUseCase externalBudgetDecision(
-        WorkOrderRepositoryPort orders, PartRepositoryPort parts, TransactionPort tx
+        WorkOrderRepositoryPort orders,
+        PartRepositoryPort parts,
+        IdempotencyPort idempotency,
+        TransactionPort tx
     ) {
-        return new ExternalBudgetDecisionService(orders, parts, tx);
+        return new ExternalBudgetDecisionService(orders, parts, idempotency, tx);
     }
 
     @Bean NotifyBudgetUseCase notifyBudget(
@@ -119,9 +123,13 @@ public class UseCaseConfiguration {
     @Bean ProcessNotificationOutboxUseCase processNotificationOutbox(
         NotificationOutboxPort outbox,
         NotificationPort notifications,
-        @Value("${app.notification.outbox.batch-size:10}") int batchSize
+        @Value("${app.notification.outbox.batch-size:10}") int batchSize,
+        @Value("${app.notification.outbox.max-attempts:3}") int maxAttempts,
+        @Value("${app.notification.outbox.processing-timeout-seconds:300}") int processingTimeoutSeconds
     ) {
-        return new ProcessNotificationOutboxService(outbox, notifications, batchSize);
+        return new ProcessNotificationOutboxService(
+            outbox, notifications, batchSize, maxAttempts, processingTimeoutSeconds
+        );
     }
 
     @Bean FinishWorkOrderUseCase finishWorkOrder(WorkOrderRepositoryPort orders, TransactionPort tx) {

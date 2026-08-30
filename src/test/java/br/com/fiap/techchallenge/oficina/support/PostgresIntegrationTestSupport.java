@@ -45,6 +45,7 @@ public abstract class PostgresIntegrationTestSupport {
     void cleanDatabase() {
         jdbcTemplate.execute("""
             truncate table
+                idempotency_records,
                 notification_outbox,
                 work_order_part_items,
                 work_order_service_items,

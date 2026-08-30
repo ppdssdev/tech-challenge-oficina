@@ -6,6 +6,9 @@ public interface ExternalBudgetDecisionUseCase {
     PublicWorkOrderStatusResult approve(Command command);
     PublicWorkOrderStatusResult reject(Command command);
 
-    record Command(String code, String document) {
+    record Command(String code, String document, String idempotencyKey) {
+        public Command(String code, String document) {
+            this(code, document, null);
+        }
     }
 }

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class NotificationOutboxPersistenceAdapter implements NotificationOutboxPort {
@@ -41,26 +42,49 @@ public class NotificationOutboxPersistenceAdapter implements NotificationOutboxP
     }
 
     @Override
+    @Transactional
+    public List<NotificationOutboxMessage> claimPending(int limit, OffsetDateTime staleBefore) {
+        var claimed = repository.findClaimableForUpdate(limit, staleBefore);
+        claimed.forEach(entity -> {
+            entity.setStatus(Status.PROCESSING);
+            entity.setAttempts(entity.getAttempts() + 1);
+            entity.setLastError(null);
+        });
+        repository.flush();
+        return claimed.stream().map(NotificationOutboxPersistenceAdapter::toMessage).toList();
+    }
+
+    @Override
     public long countByStatus(Status status) {
         return repository.countByStatus(status);
     }
 
     @Override
+    @Transactional
     public void markSent(UUID id) {
         var entity = required(id);
         entity.setStatus(Status.SENT);
         entity.setSentAt(OffsetDateTime.now());
         entity.setLastError(null);
-        repository.save(entity);
+        repository.saveAndFlush(entity);
     }
 
     @Override
+    @Transactional
+    public void markPending(UUID id, String errorMessage) {
+        var entity = required(id);
+        entity.setStatus(Status.PENDING);
+        entity.setLastError(errorMessage);
+        repository.saveAndFlush(entity);
+    }
+
+    @Override
+    @Transactional
     public void markFailed(UUID id, String errorMessage) {
         var entity = required(id);
         entity.setStatus(Status.FAILED);
-        entity.setAttempts(entity.getAttempts() + 1);
         entity.setLastError(errorMessage);
-        repository.save(entity);
+        repository.saveAndFlush(entity);
     }
 
     private NotificationOutboxJpaEntity required(UUID id) {

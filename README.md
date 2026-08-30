@@ -137,6 +137,36 @@ O projeto usa DDD de forma pragmática dentro de um monólito em camadas:
 - `Part` controla regras de estoque, como baixa, incremento, estoque mínimo e concorrência.
 - Serviços de aplicação coordenam casos de uso e transações, mas regras críticas ficam no domínio.
 
+## Idempotência
+
+O endpoint público `POST /api/v1/public/work-orders/{code}/budget/approve` aceita opcionalmente o header `Idempotency-Key`. Ele evita dupla aprovação e dupla baixa de estoque em retries causados por timeout, duplo clique ou repetição do cliente.
+
+A chave é vinculada à operação `PUBLIC_BUDGET_APPROVE`, ao código da OS e ao documento normalizado do cliente. A primeira chamada valida o documento, bloqueia a OS e as peças, aprova o orçamento, baixa o estoque e conclui o registro de idempotência na mesma transação. Uma repetição com a mesma chave e a mesma requisição retorna `200 OK` com o status público atual, sem executar novamente os efeitos. A reutilização da chave com outro código ou documento retorna `409 Conflict`. Sem o header, o fluxo mantém o comportamento normal e as regras de estado existentes.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/public/work-orders/{code}/budget/approve \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: approve-{code}-001" \
+  -d '{"document":"12345678909"}'
+```
+
+Somente o hash SHA-256 da operação, código e documento normalizado é persistido; o payload bruto, o JWT e o documento não são armazenados no registro técnico. A unicidade de `(operation, idempotency_key)`, o `INSERT ... ON CONFLICT` e o lock pessimista protegem chamadas concorrentes entre réplicas.
+
+## Outbox com claim transacional
+
+O worker não envia mensagens apenas consultando itens `PENDING`. Primeiro ele reivindica um lote em uma transação curta com `FOR UPDATE SKIP LOCKED`, altera os itens para `PROCESSING`, incrementa `attempts` e confirma a transação. O e-mail é enviado somente depois do commit; em seguida, outra transação curta marca cada item como `SENT`, devolve-o a `PENDING` para retry ou o encerra como `FAILED`.
+
+Os estados são:
+
+- `PENDING`: disponível para claim;
+- `PROCESSING`: reivindicada por um worker;
+- `SENT`: enviada com sucesso;
+- `FAILED`: falha definitiva após o limite de tentativas.
+
+Por padrão, são realizadas até três tentativas. Itens `PROCESSING` cujo `updated_at` ultrapasse 300 segundos são considerados abandonados e podem ser reivindicados novamente, cobrindo a queda de uma instância após o claim. Os valores são configuráveis por `APP_NOTIFICATION_OUTBOX_MAX_ATTEMPTS` e `APP_NOTIFICATION_OUTBOX_PROCESSING_TIMEOUT_SECONDS`.
+
+Esse claim é necessário porque o HPA permite múltiplas réplicas e, portanto, múltiplos schedulers. O `SKIP LOCKED` distribui os registros entre workers concorrentes sem que duas réplicas reivindiquem a mesma mensagem. Em ambiente local, o Mailpit simula o provedor de e-mail; em produção, o adapter pode ser substituído por SES, SendGrid ou outro provedor sem alterar o caso de uso.
+
 ### Documentação técnica
 
 - [Roteiro 11 — documentação técnica final e defesa para a banca](docs/roteiro-11-documentacao-final.md)
@@ -285,7 +315,7 @@ POST /api/v1/admin/work-orders/{id}/finish
 POST /api/v1/admin/work-orders/{id}/deliver
 ```
 
-O endpoint de notificação não altera o status da OS. Ele grava uma mensagem `PENDING` na outbox e retorna a prévia com os links públicos. O scheduler processa a fila automaticamente; o endpoint administrativo permite dispará-la manualmente na demonstração. Após o envio, o e-mail aparece no Mailpit e a mensagem passa a `SENT`; uma falha isolada vira `FAILED`, registra `attempts` e `lastError` e não interrompe o restante do lote.
+O endpoint de notificação não altera o status da OS. Ele grava uma mensagem `PENDING` na outbox e retorna a prévia com os links públicos. O scheduler processa a fila automaticamente; o endpoint administrativo permite dispará-la manualmente na demonstração. Antes do envio, a mensagem é reivindicada como `PROCESSING`; depois passa a `SENT`. Uma falha registra `attempts` e `lastError`, volta a `PENDING` enquanto houver tentativas e termina em `FAILED` ao atingir o limite, sem interromper o restante do lote.
 
 O endpoint `POST /api/v1/admin/work-orders/{id}/diagnosis/start` é usado para OS em `RECEIVED`. No fluxo acima, a OS já vai para `WAITING_APPROVAL`; se chamar diagnóstico nesse estado, a API retorna `422 Unprocessable Entity`, porque viola a transição permitida do domínio.
 
@@ -412,7 +442,7 @@ mvn spring-boot:run
 
 A API publica métricas do Spring Boot Actuator no endpoint `/actuator/prometheus` usando Micrometer Prometheus. O Prometheus coleta essas métricas a cada 15 segundos, e o Grafana recebe automaticamente o datasource Prometheus e o dashboard versionado **Oficina API - Observabilidade local**.
 
-O dashboard apresenta status da API, taxa e latência média das requisições HTTP, memória da JVM, CPU do processo e quantidades da outbox nos estados `PENDING` e `FAILED`. Toda a solução é gratuita e executada localmente: não usa Grafana Cloud, Datadog, New Relic, CloudWatch ou qualquer outro serviço pago. Também não inclui tracing distribuído, Loki, Alertmanager, Helm ou Prometheus Operator.
+O dashboard apresenta status da API, taxa e latência média das requisições HTTP, memória da JVM, CPU do processo e quantidades da outbox nos estados `PENDING`, `PROCESSING` e `FAILED`. Toda a solução é gratuita e executada localmente: não usa Grafana Cloud, Datadog, New Relic, CloudWatch ou qualquer outro serviço pago. Também não inclui tracing distribuído, Loki, Alertmanager, Helm ou Prometheus Operator.
 
 ### Docker Compose
 
@@ -548,7 +578,7 @@ kubectl -n oficina top pods
 
 O HPA não escala PostgreSQL, Mailpit, Prometheus ou Grafana. Em produção, o banco exige uma estratégia própria, como serviço gerenciado (RDS/Aurora), replicação e tuning adequados à carga.
 
-A API também contém um scheduler da outbox. No ambiente acadêmico/local, o HPA demonstra a elasticidade da API, mas o processador atual não possui claim/locking atômico entre réplicas. Em produção, o processamento da outbox deve usar locking transacional, estado `PROCESSING`, `SELECT FOR UPDATE SKIP LOCKED`, worker separado ou mecanismo equivalente para impedir o envio duplicado quando mais de uma réplica executar o scheduler.
+A API também contém um scheduler da outbox. Como o HPA pode manter várias réplicas, o processador usa claim transacional, estado `PROCESSING` e `SELECT FOR UPDATE SKIP LOCKED`. Cada mensagem fica bloqueada e é atribuída a um único worker antes do envio, impedindo que schedulers concorrentes processem simultaneamente o mesmo registro.
 
 ### 4. Acessar e validar a API
 
@@ -694,7 +724,7 @@ A URL base usada nos links da notificação é `http://localhost:8080` por padr�
 APP_PUBLIC_BASE_URL
 ```
 
-O processamento da outbox e o remetente local podem ser configurados por `APP_NOTIFICATION_OUTBOX_ENABLED`, `APP_NOTIFICATION_OUTBOX_POLL_DELAY_MS`, `APP_NOTIFICATION_OUTBOX_BATCH_SIZE` e `APP_NOTIFICATION_EMAIL_FROM`.
+O processamento da outbox e o remetente local podem ser configurados por `APP_NOTIFICATION_OUTBOX_ENABLED`, `APP_NOTIFICATION_OUTBOX_POLL_DELAY_MS`, `APP_NOTIFICATION_OUTBOX_BATCH_SIZE`, `APP_NOTIFICATION_OUTBOX_MAX_ATTEMPTS`, `APP_NOTIFICATION_OUTBOX_PROCESSING_TIMEOUT_SECONDS` e `APP_NOTIFICATION_EMAIL_FROM`.
 
 ---
 
@@ -876,7 +906,7 @@ POST /api/v1/admin/work-orders/{id}/budget/notify
 
 A resposta contém destinatário, assunto, corpo e os links `approveUrl` e `rejectUrl`. O cliente ainda precisa enviar seu CPF ou CNPJ no body ao chamar um desses endpoints `POST`. A notificação não altera o status da OS nem envia SMTP dentro da requisição. A outbox evita perder a intenção de notificação quando o SMTP está temporariamente indisponível.
 
-Um scheduler consulta mensagens pendentes a cada cinco segundos. Para processar imediatamente, use o endpoint protegido por JWT:
+Um scheduler reivindica mensagens processáveis a cada cinco segundos com claim transacional e `FOR UPDATE SKIP LOCKED`. Para processar imediatamente, use o endpoint protegido por JWT:
 
 ```http
 POST /api/v1/admin/notifications/outbox/process
