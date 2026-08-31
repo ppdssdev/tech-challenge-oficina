@@ -66,7 +66,7 @@ spec:
             # Em produção, os requests devem ser definidos com base em métricas reais da aplicação.
             requests:
               cpu: "50m"
-              memory: "384Mi"
+              memory: "768Mi"
             limits:
               cpu: "1"
               memory: "1Gi"
