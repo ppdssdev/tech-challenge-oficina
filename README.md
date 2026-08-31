@@ -6,6 +6,36 @@ O projeto foi construído como **monólito Spring Boot com arquitetura hexagonal
 
 ---
 
+## Arquitetura proposta
+
+A arquitetura do projeto está documentada nos desenhos abaixo, contemplando os componentes da aplicação, a infraestrutura provisionada e o fluxo de deploy e execução.
+
+### Componentes da aplicação
+
+A aplicação foi estruturada como um monólito modular com arquitetura hexagonal e DDD pragmático. Os adaptadores de entrada expõem os endpoints REST, a camada de aplicação orquestra os casos de uso, o domínio concentra as regras de negócio e os adaptadores de saída integram persistência, notificações e observabilidade.
+
+![Arquitetura da Aplicação](docs/images/arquitetura-aplicacao.png)
+
+### Infraestrutura provisionada
+
+O ambiente local reproduzível utiliza Docker, Kind/Kubernetes, Terraform, PostgreSQL, Mailpit, Prometheus, Grafana, Metrics Server e HPA. A infraestrutura permite demonstrar execução local, observabilidade, configuração por ConfigMap/Secret e escalabilidade horizontal da API.
+
+![Infraestrutura Provisionada](docs/images/infraestrutura-provisionada.png)
+
+### Fluxo de deploy e execução
+
+O fluxo de entrega contempla versionamento no GitLab, validação em CI, build da imagem, execução funcional com Docker Compose e execução arquitetural com Terraform, Kind e Kubernetes. O ambiente Kubernetes pode ser inspecionado com `kubectl` para pods, services, deployments e HPA.
+
+![Fluxo de Deploy e Execução](docs/images/fluxo-deploy-execucao.png)
+
+## Vídeo de apresentação
+
+Link do vídeo no YouTube: **PENDENTE — substituir após upload do vídeo de apresentação**
+
+O link será atualizado após a gravação, edição e publicação do vídeo final de apresentação, com duração máxima de 15 minutos.
+
+---
+
 ## Stack
 
 - Java 21
