@@ -62,9 +62,11 @@ spec:
             timeoutSeconds: 3
             failureThreshold: 3
           resources:
+            # Valores reduzidos para facilitar a demonstração do HPA em ambiente local/Kind.
+            # Em produção, os requests devem ser definidos com base em métricas reais da aplicação.
             requests:
-              cpu: "250m"
-              memory: "512Mi"
+              cpu: "10m"
+              memory: "384Mi"
             limits:
               cpu: "1"
               memory: "1Gi"
