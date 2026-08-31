@@ -65,7 +65,7 @@ spec:
             # Valores reduzidos para facilitar a demonstração do HPA em ambiente local/Kind.
             # Em produção, os requests devem ser definidos com base em métricas reais da aplicação.
             requests:
-              cpu: "10m"
+              cpu: "50m"
               memory: "384Mi"
             limits:
               cpu: "1"
