@@ -30,9 +30,7 @@ O fluxo de entrega contempla versionamento no GitLab, validação em CI, build d
 
 ## Vídeo de apresentação
 
-Link do vídeo no YouTube: **PENDENTE — substituir após upload do vídeo de apresentação**
-
-O link será atualizado após a gravação, edição e publicação do vídeo final de apresentação, com duração máxima de 15 minutos.
+Link do vídeo no YouTube: https://youtu.be/8tpXe1BIx18
 
 ---
 
