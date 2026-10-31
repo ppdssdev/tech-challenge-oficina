@@ -194,12 +194,12 @@ public class ApiExceptionHandler {
 
         if (status.is5xxServerError()) {
             log.error(
-                    "Erro inesperado na API. traceId={} status={} path={} message={}",
+                    "Erro inesperado na API. traceId={} status={} path={} exception={} message={}",
                     traceId,
                     status.value(),
                     request.getRequestURI(),
-                    message,
-                    ex
+                    ex.getClass().getSimpleName(),
+                    PiiMasker.mask(message)
             );
         } else {
             log.warn(
@@ -208,7 +208,7 @@ public class ApiExceptionHandler {
                     status.value(),
                     request.getRequestURI(),
                     ex.getClass().getSimpleName(),
-                    ex.getMessage()
+                    PiiMasker.mask(ex.getMessage())
             );
         }
 

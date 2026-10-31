@@ -7,13 +7,11 @@ import br.com.fiap.techchallenge.oficina.application.port.in.ExternalBudgetDecis
 import br.com.fiap.techchallenge.oficina.application.port.in.GetWorkOrderUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -31,10 +29,13 @@ public class PublicWorkOrderController {
         this.budgetDecision = budgetDecision;
     }
 
-    @GetMapping("/{code}/status")
-    @Operation(summary = "Consulta pública de andamento da OS por código e CPF/CNPJ")
-    public PublicWorkOrderStatusResponse status(@PathVariable String code, @RequestParam String document) {
-        return WebDtoMapper.toPublicResponse(service.getPublicStatus(code, document));
+    @PostMapping("/{code}/status")
+    @Operation(summary = "Consulta pública de andamento da OS sem expor CPF/CNPJ na URL")
+    public PublicWorkOrderStatusResponse status(
+        @PathVariable String code,
+        @Valid @RequestBody BudgetDecisionRequest request
+    ) {
+        return WebDtoMapper.toPublicResponse(service.getPublicStatus(code, request.document()));
     }
 
     @PostMapping("/{code}/budget/approve")

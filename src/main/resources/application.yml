@@ -67,8 +67,8 @@ app:
     email:
       from: ${APP_NOTIFICATION_EMAIL_FROM:oficina@local.test}
   jwt:
-    secret: ${APP_JWT_SECRET:awssecretpostech-oficina-fiap-2026}
+    secret: ${APP_JWT_SECRET}
     expiration-minutes: ${APP_JWT_EXPIRATION_MINUTES:120}
   admin:
-    default-username: ${APP_ADMIN_DEFAULT_USERNAME:admin}
-    default-password: ${APP_ADMIN_DEFAULT_PASSWORD:admin123}
+    default-username: ${APP_ADMIN_DEFAULT_USERNAME}
+    default-password: ${APP_ADMIN_DEFAULT_PASSWORD}

@@ -1,6 +1,8 @@
 package br.com.fiap.techchallenge.oficina.api;
 
 import br.com.fiap.techchallenge.oficina.application.port.out.NotificationOutboxPort;
+import br.com.fiap.techchallenge.oficina.application.port.out.AppUserRepositoryPort;
+import br.com.fiap.techchallenge.oficina.domain.model.user.AppUser;
 import br.com.fiap.techchallenge.oficina.support.PostgresIntegrationTestSupport;
 import java.math.BigDecimal;
 import java.net.URI;
@@ -22,6 +24,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -38,6 +41,12 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     NotificationOutboxPort notificationOutbox;
+
+    @Autowired
+    AppUserRepositoryPort users;
+
+    @Autowired
+    PasswordEncoder passwordEncoder;
 
     @Test
     void shouldRunMainWorkOrderFlowThroughRestApi() {
@@ -68,11 +77,9 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
         assertThat(delivered.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(requiredValue(delivered, "status")).isEqualTo("DELIVERED");
 
-        ResponseEntity<Map<String, Object>> publicStatus = restTemplate.exchange(
-            url("/api/v1/public/work-orders/" + code + "/status?document=52998224725"),
-            HttpMethod.GET,
-            HttpEntity.EMPTY,
-            JSON_OBJECT
+        ResponseEntity<Map<String, Object>> publicStatus = postPublicBudgetDecision(
+            "/api/v1/public/work-orders/" + code + "/status",
+            Map.of("document", "52998224725")
         );
         assertThat(publicStatus.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(requiredValue(publicStatus, "status")).isEqualTo("DELIVERED");
@@ -88,6 +95,22 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
+    void shouldForbidAuthenticatedCustomerFromAdministrativeEndpoints() {
+        String username = "customer-" + UUID.randomUUID();
+        String password = "customer-password";
+        users.save(new AppUser(username, passwordEncoder.encode(password), "CUSTOMER"));
+
+        ResponseEntity<String> response = restTemplate.exchange(
+            url("/api/v1/admin/work-orders"),
+            HttpMethod.GET,
+            new HttpEntity<>(adminHeaders(login(username, password))),
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
     void shouldNotExposePublicWorkOrderStatusForDifferentDocument() {
         String token = login();
         HttpHeaders adminHeaders = adminHeaders(token);
@@ -96,11 +119,9 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
         ResponseEntity<Map<String, Object>> createOrderResponse = createOrder(adminHeaders, serviceId, partId);
         String code = requiredValue(createOrderResponse, "code").toString();
 
-        ResponseEntity<Map<String, Object>> publicStatus = restTemplate.exchange(
-            url("/api/v1/public/work-orders/" + code + "/status?document=00000000000"),
-            HttpMethod.GET,
-            HttpEntity.EMPTY,
-            JSON_OBJECT
+        ResponseEntity<Map<String, Object>> publicStatus = postPublicBudgetDecision(
+            "/api/v1/public/work-orders/" + code + "/status",
+            Map.of("document", "00000000000")
         );
 
         assertThat(publicStatus.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -178,11 +199,9 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
         assertThat(approved.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(requiredValue(approved, "status")).isEqualTo("IN_EXECUTION");
 
-        ResponseEntity<Map<String, Object>> publicStatus = restTemplate.exchange(
-            url("/api/v1/public/work-orders/" + code + "/status?document=52998224725"),
-            HttpMethod.GET,
-            HttpEntity.EMPTY,
-            JSON_OBJECT
+        ResponseEntity<Map<String, Object>> publicStatus = postPublicBudgetDecision(
+            "/api/v1/public/work-orders/" + code + "/status",
+            Map.of("document", "52998224725")
         );
         assertThat(publicStatus.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(requiredValue(publicStatus, "status")).isEqualTo("IN_EXECUTION");
@@ -334,13 +353,26 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    @Test
+    void shouldDisableLegacyStatusQueryEndpointOutsideLocalProfile() {
+        ResponseEntity<String> response = restTemplate.getForEntity(
+            url("/api/v1/public/work-orders/OS-INEXISTENTE/status?document=52998224725"), String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+    }
+
     private String login() {
+        return login("admin", "admin123");
+    }
+
+    private String login(String username, String password) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
             url("/api/v1/auth/login"),
             HttpMethod.POST,
-            new HttpEntity<>(Map.of("username", "admin", "password", "admin123"), headers),
+            new HttpEntity<>(Map.of("username", username, "password", password), headers),
             JSON_OBJECT
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
