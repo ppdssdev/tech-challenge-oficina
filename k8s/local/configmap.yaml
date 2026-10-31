@@ -4,6 +4,7 @@ metadata:
   name: oficina-api-config
   namespace: oficina
 data:
+  SPRING_PROFILES_ACTIVE: local
   SPRING_DATASOURCE_URL: jdbc:postgresql://oficina-postgres:5432/oficina_db
   SPRING_DATASOURCE_USERNAME: oficina
   SPRING_MAIL_HOST: oficina-mailpit

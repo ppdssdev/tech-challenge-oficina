@@ -350,7 +350,10 @@ O endpoint `POST /api/v1/admin/work-orders/{id}/diagnosis/start` é usado para O
 ### 6. Consultar andamento pelo cliente
 
 ```http
-GET /api/v1/public/work-orders/{code}/status?document=52998224725
+POST /api/v1/public/work-orders/{code}/status
+Content-Type: application/json
+
+{"document":"52998224725"}
 ```
 
 Esse endpoint é público, mas exige o documento do cliente para evitar consulta aberta somente pelo código da OS.
@@ -917,7 +920,10 @@ POST /api/v1/admin/work-orders/{id}/deliver
 Os endpoints abaixo não exigem JWT. As decisões de orçamento exigem o documento do cliente no corpo da requisição para validar o acesso à OS.
 
 ```http
-GET /api/v1/public/work-orders/{code}/status?document=52998224725
+POST /api/v1/public/work-orders/{code}/status
+Content-Type: application/json
+
+{"document":"52998224725"}
 POST /api/v1/public/work-orders/{code}/budget/approve
 POST /api/v1/public/work-orders/{code}/budget/reject
 ```
@@ -1086,7 +1092,9 @@ curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/deliver \
 ### 8. Consulta pública do cliente
 
 ```bash
-curl "http://localhost:8080/api/v1/public/work-orders/{code}/status?document=52998224725"
+curl -X POST "http://localhost:8080/api/v1/public/work-orders/{code}/status" \
+  -H "Content-Type: application/json" \
+  -d '{"document":"52998224725"}'
 ```
 
 ---

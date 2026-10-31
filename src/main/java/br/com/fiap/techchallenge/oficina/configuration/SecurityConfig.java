@@ -30,7 +30,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(exception -> exception
                 .authenticationEntryPoint((request, response, authException) -> response.sendError(401, "Token JWT ausente ou inválido."))
-                .accessDeniedHandler((request, response, accessDeniedException) -> response.sendError(403, "Acesso negado."))
+                .accessDeniedHandler((request, response, accessDeniedException) -> response.setStatus(403))
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
@@ -43,6 +43,7 @@ public class SecurityConfig {
                     "/swagger-ui/**",
                     "/v3/api-docs/**"
                 ).permitAll()
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

@@ -1,0 +1,10 @@
+# Explicitly opt in with SPRING_PROFILES_ACTIVE=local. Never enable this profile in production.
+spring:
+  datasource:
+    password: ${SPRING_DATASOURCE_PASSWORD:oficina}
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:local-only-jwt-secret-change-before-production-2026}
+  admin:
+    default-username: ${APP_ADMIN_DEFAULT_USERNAME:admin}
+    default-password: ${APP_ADMIN_DEFAULT_PASSWORD:admin123}
