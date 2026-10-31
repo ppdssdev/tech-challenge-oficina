@@ -21,7 +21,7 @@ public final class ApplicationResultMapper {
     public static CustomerResult toResult(Customer customer) {
         return new CustomerResult(
             customer.getId(), customer.getFullName(), customer.getDocumentType(), customer.getDocumentNumber(),
-            customer.getEmail(), customer.getPhone(), customer.getCreatedAt(), customer.getUpdatedAt()
+            customer.getEmail(), customer.getPhone(), customer.getCreatedAt(), customer.isActive(), customer.getUpdatedAt()
         );
     }
 

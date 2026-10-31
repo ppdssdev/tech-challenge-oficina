@@ -1,5 +1,6 @@
 package br.com.fiap.techchallenge.oficina.adapters.out.persistence;
 
+import br.com.fiap.techchallenge.oficina.domain.service.DocumentValidator;
 import br.com.fiap.techchallenge.oficina.adapters.out.persistence.entity.CustomerJpaEntity;
 import br.com.fiap.techchallenge.oficina.adapters.out.persistence.mapper.CustomerPersistenceMapper;
 import br.com.fiap.techchallenge.oficina.adapters.out.persistence.repository.SpringDataCustomerRepository;
@@ -27,7 +28,8 @@ public class CustomerPersistenceAdapter implements CustomerRepositoryPort {
 
     @Override public Optional<Customer> findById(UUID id) { return repository.findById(id).map(CustomerPersistenceMapper::toDomain); }
     @Override public Optional<Customer> findByDocumentNumber(String value) { return repository.findByDocumentNumber(value).map(CustomerPersistenceMapper::toDomain); }
+    @Override public Optional<Customer> findByDocumentNumberAndActive(String value, boolean active) { return repository.findByDocumentNumberAndActive(DocumentValidator.onlyDigits(value), active).map(CustomerPersistenceMapper::toDomain); }
     @Override public boolean existsByDocumentNumber(String value) { return repository.existsByDocumentNumber(value); }
     @Override public List<Customer> findAll() { return repository.findAll().stream().map(CustomerPersistenceMapper::toDomain).toList(); }
-    @Override public void delete(Customer customer) { repository.deleteById(customer.getId()); }
+    @Override public void delete(Customer customer) { customer.deactivate(); save(customer); }
 }

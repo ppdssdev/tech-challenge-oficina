@@ -1,5 +1,8 @@
 package br.com.fiap.techchallenge.oficina.adapters.out.persistence;
 
+import br.com.fiap.techchallenge.oficina.adapters.out.persistence.repository.SpringDataWorkOrderStatusHistoryRepository;
+import br.com.fiap.techchallenge.oficina.adapters.out.persistence.entity.WorkOrderStatusHistoryJpaEntity;
+import org.springframework.transaction.annotation.Transactional;
 import br.com.fiap.techchallenge.oficina.adapters.out.persistence.entity.WorkOrderJpaEntity;
 import br.com.fiap.techchallenge.oficina.adapters.out.persistence.mapper.WorkOrderPersistenceMapper;
 import br.com.fiap.techchallenge.oficina.adapters.out.persistence.repository.SpringDataCustomerRepository;
@@ -19,6 +22,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class WorkOrderPersistenceAdapter implements WorkOrderRepositoryPort {
+    private final SpringDataWorkOrderStatusHistoryRepository history;
     private final SpringDataWorkOrderRepository repository;
     private final SpringDataCustomerRepository customers;
     private final SpringDataVehicleRepository vehicles;
@@ -27,12 +31,14 @@ public class WorkOrderPersistenceAdapter implements WorkOrderRepositoryPort {
 
     public WorkOrderPersistenceAdapter(
         SpringDataWorkOrderRepository repository,
+        SpringDataWorkOrderStatusHistoryRepository history,
         SpringDataCustomerRepository customers,
         SpringDataVehicleRepository vehicles,
         SpringDataServiceCatalogRepository services,
         SpringDataPartRepository parts
     ) {
         this.repository = repository;
+        this.history = history;
         this.customers = customers;
         this.vehicles = vehicles;
         this.services = services;
@@ -40,6 +46,7 @@ public class WorkOrderPersistenceAdapter implements WorkOrderRepositoryPort {
     }
 
     @Override
+    @Transactional
     public WorkOrder save(WorkOrder order) {
         WorkOrderJpaEntity entity = order.getId() == null ? new WorkOrderJpaEntity() : loadDetailedEntity(order.getId());
         WorkOrderPersistenceMapper.updateEntity(
@@ -50,7 +57,15 @@ public class WorkOrderPersistenceAdapter implements WorkOrderRepositoryPort {
             services::getReferenceById,
             parts::getReferenceById
         );
-        return WorkOrderPersistenceMapper.toDomain(repository.saveAndFlush(entity), true);
+        entity = repository.saveAndFlush(entity);
+        int sequence = Math.toIntExact(history.countByWorkOrderId(entity.getId()));
+        for (var event : order.getStatusTransitions()) {
+            if (!history.existsById(event.id())) {
+                history.saveAndFlush(new WorkOrderStatusHistoryJpaEntity(
+                    entity.getId(), event, ++sequence));
+            }
+        }
+        return WorkOrderPersistenceMapper.toDomain(entity, true);
     }
 
     @Override public boolean existsByCode(String code) { return repository.existsByCode(code); }
@@ -79,7 +94,7 @@ public class WorkOrderPersistenceAdapter implements WorkOrderRepositoryPort {
     @Override public List<WorkOrder> findCompletedForMetricsBetween(OffsetDateTime from, OffsetDateTime to) { return summaries(repository.findCompletedForMetricsBetween(from, to)); }
 
     private Optional<WorkOrderJpaEntity> detailed(UUID id) {
-        var entity = repository.findDetailedById(id);
+        var entity = repository.findByIdForUpdate(id);
         if (entity.isPresent()) {
             repository.loadServiceItems(id);
             repository.loadPartItems(id);

@@ -21,6 +21,31 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class WorkOrderDomainTest {
 
     @Test
+    void shouldRecordIntermediateStatesAndRepeatedExecutionIntervals() {
+        var order = sampleOrder();
+        var service = new ServiceCatalogItem("Diagnóstico", "Serviço", BigDecimal.TEN, 10);
+        order.updateDiagnosticNotes("Diagnóstico iniciado");
+        order.updateDiagnosticNotes("Notas atualizadas");
+        order.addRequestedService(service, 1);
+        order.approveBudget();
+        order.addRequestedService(service, 1);
+        order.approveBudget();
+        order.finish();
+        order.deliver();
+        var events = order.getStatusTransitions();
+        assertThat(events).extracting(event -> event.newStatus()).containsExactly(
+            WorkOrderStatus.RECEIVED, WorkOrderStatus.IN_DIAGNOSIS, WorkOrderStatus.WAITING_APPROVAL,
+            WorkOrderStatus.IN_EXECUTION, WorkOrderStatus.WAITING_APPROVAL, WorkOrderStatus.IN_EXECUTION,
+            WorkOrderStatus.FINALIZED, WorkOrderStatus.DELIVERED);
+        assertThat(events).extracting(event -> event.id()).doesNotHaveDuplicates();
+        for (int i = 1; i < events.size(); i++) {
+            assertThat(events.get(i).previousStatus()).isEqualTo(events.get(i - 1).newStatus());
+        }
+        assertThatThrownBy(order::finish).isInstanceOf(BusinessException.class);
+        assertThat(order.getStatusTransitions()).hasSize(8);
+    }
+
+    @Test
     void shouldGenerateBudgetAutomaticallyAndWaitForApproval() {
         var order = sampleOrder();
         var service = new ServiceCatalogItem("Troca de óleo", "Óleo", BigDecimal.valueOf(120), 40);

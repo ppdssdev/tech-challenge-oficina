@@ -11,6 +11,7 @@ public interface ManageCustomersUseCase {
     CustomerResult get(UUID id);
     CustomerResult update(UUID id, Command command);
     void delete(UUID id);
+    CustomerResult setActive(UUID id, boolean active);
 
     record Command(String fullName, DocumentType documentType, String documentNumber, String email, String phone) {
     }

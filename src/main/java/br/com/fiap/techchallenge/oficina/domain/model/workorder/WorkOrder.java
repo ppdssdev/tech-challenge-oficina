@@ -24,6 +24,7 @@ public class WorkOrder extends BaseEntity {
     private final Customer customer;
     private final Vehicle vehicle;
     private WorkOrderStatus status;
+    private final List<WorkOrderStatusTransition> statusTransitions = new ArrayList<>();
     private String diagnosticNotes;
     private OffsetDateTime customerAuthorizedAt;
     private OffsetDateTime startedAt;
@@ -48,7 +49,7 @@ public class WorkOrder extends BaseEntity {
         this.code = code;
         this.customer = customer;
         this.vehicle = vehicle;
-        this.status = WorkOrderStatus.RECEIVED;
+        transitionTo(WorkOrderStatus.RECEIVED);
         this.diagnosticNotes = normalize(diagnosticNotes);
     }
 
@@ -73,6 +74,7 @@ public class WorkOrder extends BaseEntity {
     ) {
         var order = new WorkOrder(code, customer, vehicle, diagnosticNotes);
         order.status = status;
+        order.statusTransitions.clear();
         order.customerAuthorizedAt = customerAuthorizedAt;
         order.startedAt = startedAt;
         order.finishedAt = finishedAt;
@@ -122,21 +124,21 @@ public class WorkOrder extends BaseEntity {
         if (status != WorkOrderStatus.RECEIVED) {
             throw new BusinessException("Apenas OS recebida pode entrar em diagnóstico.");
         }
-        this.status = WorkOrderStatus.IN_DIAGNOSIS;
+        transitionTo(WorkOrderStatus.IN_DIAGNOSIS);
         this.diagnosticNotes = normalize(notes);
     }
 
     public void updateDiagnosticNotes(String notes) {
         this.diagnosticNotes = normalize(notes);
         if (status == WorkOrderStatus.RECEIVED) {
-            this.status = WorkOrderStatus.IN_DIAGNOSIS;
+            transitionTo(WorkOrderStatus.IN_DIAGNOSIS);
         }
     }
 
     public void sendBudgetForApprovalIfNeeded() {
         if (totalAmount.compareTo(BigDecimal.ZERO) > 0
             && (status == WorkOrderStatus.RECEIVED || status == WorkOrderStatus.IN_DIAGNOSIS || status == WorkOrderStatus.IN_EXECUTION)) {
-            status = WorkOrderStatus.WAITING_APPROVAL;
+            transitionTo(WorkOrderStatus.WAITING_APPROVAL);
         }
     }
 
@@ -146,7 +148,7 @@ public class WorkOrder extends BaseEntity {
         }
         reservePendingPartsStock();
         this.customerAuthorizedAt = OffsetDateTime.now();
-        this.status = WorkOrderStatus.IN_EXECUTION;
+        transitionTo(WorkOrderStatus.IN_EXECUTION);
         if (startedAt == null) {
             startedAt = OffsetDateTime.now();
         }
@@ -159,14 +161,14 @@ public class WorkOrder extends BaseEntity {
         if (startedAt != null) {
             throw new BusinessException("Recusa de orçamento adicional em OS já iniciada não é suportada nesta etapa.");
         }
-        this.status = WorkOrderStatus.BUDGET_REJECTED;
+        transitionTo(WorkOrderStatus.BUDGET_REJECTED);
     }
 
     public void finish() {
         if (status != WorkOrderStatus.IN_EXECUTION) {
             throw new BusinessException("Somente OS em execução pode ser finalizada.");
         }
-        this.status = WorkOrderStatus.FINALIZED;
+        transitionTo(WorkOrderStatus.FINALIZED);
         this.finishedAt = OffsetDateTime.now();
     }
 
@@ -174,7 +176,7 @@ public class WorkOrder extends BaseEntity {
         if (status != WorkOrderStatus.FINALIZED) {
             throw new BusinessException("Somente OS finalizada pode ser entregue.");
         }
-        this.status = WorkOrderStatus.DELIVERED;
+        transitionTo(WorkOrderStatus.DELIVERED);
         this.deliveredAt = OffsetDateTime.now();
     }
 
@@ -234,6 +236,16 @@ public class WorkOrder extends BaseEntity {
 
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private void transitionTo(WorkOrderStatus next) {
+        if (status == next) return;
+        statusTransitions.add(new WorkOrderStatusTransition(UUID.randomUUID(), status, next, OffsetDateTime.now()));
+        status = next;
+    }
+
+    public List<WorkOrderStatusTransition> getStatusTransitions() {
+        return List.copyOf(statusTransitions);
     }
 
     public String getCode() {

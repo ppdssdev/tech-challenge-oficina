@@ -9,6 +9,7 @@ public interface CustomerRepositoryPort {
     Customer save(Customer customer);
     Optional<Customer> findById(UUID id);
     Optional<Customer> findByDocumentNumber(String documentNumber);
+    Optional<Customer> findByDocumentNumberAndActive(String documentNumber, boolean active);
     boolean existsByDocumentNumber(String documentNumber);
     List<Customer> findAll();
     void delete(Customer customer);

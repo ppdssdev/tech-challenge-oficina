@@ -21,7 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
-@WebMvcTest(MetricsController.class)
+@WebMvcTest({MetricsController.class, br.com.fiap.techchallenge.oficina.adapters.in.web.CustomerController.class})
 @Import(SecurityConfig.class)
 class AdminRbacSecurityTest {
 
@@ -34,6 +34,9 @@ class AdminRbacSecurityTest {
     @MockitoBean
     CalculateWorkOrderMetricsUseCase metrics;
 
+    @MockitoBean
+    br.com.fiap.techchallenge.oficina.application.port.in.ManageCustomersUseCase customers;
+
     @BeforeEach
     void letRequestsContinueThroughTheMockedJwtFilter() throws Exception {
         doAnswer(invocation -> {
@@ -42,6 +45,28 @@ class AdminRbacSecurityTest {
             return null;
         }).when(jwtAuthenticationFilter).doFilter(any(), any(), any());
         when(metrics.averageExecutionTime(null, null)).thenReturn(new ExecutionTimeMetrics(0, null, null));
+    }
+
+    @Test
+    void shouldAuthorizeCustomerStatusChangesOnlyForAdmins() throws Exception {
+        var id = java.util.UUID.randomUUID();
+        String path = "/api/v1/admin/customers/" + id + "/status";
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
+            .contentType("application/json").content("{\"active\":false}"))
+            .andExpect(status().isUnauthorized());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
+            .with(user("customer").roles("CUSTOMER")).contentType("application/json").content("{\"active\":false}"))
+            .andExpect(status().isForbidden());
+        when(customers.setActive(id, false)).thenReturn(new br.com.fiap.techchallenge.oficina.application.port.in.result.CustomerResult(
+            id, "Maria", br.com.fiap.techchallenge.oficina.domain.model.customer.DocumentType.CPF,
+            "52998224725", null, null, null, false, null));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
+            .with(user("admin").roles("ADMIN")).contentType("application/json").content("{\"active\":false}"))
+            .andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.active").value(false));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
+            .with(user("admin").roles("ADMIN")).contentType("application/json").content("{}"))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
