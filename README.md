@@ -1128,3 +1128,15 @@ Peças:
 - O endpoint público exige documento do cliente para evitar consulta aberta apenas pelo código da OS.
 - A aprovação da OS trava pessimisticamente as peças envolvidas antes de baixar estoque, reduzindo risco de corrida em aprovações concorrentes.
 - A entidade `Part` usa `@Version` para detecção otimista de conflitos de atualização.
+
+## Fase 3 — bootstrap multi-repositório
+
+CI independente e contratos preparados; **nenhuma infraestrutura AWS implantada**.
+
+- [Repositórios e governança](docs/fase3/repositories.md)
+- [Arquitetura e autenticação proposta](docs/fase3/deployment-architecture.md)
+- [CI atual e CD futuro](docs/fase3/cicd-strategy.md)
+- [Dependências, state e orçamento](docs/fase3/aws-infrastructure-dependencies.md)
+
+Lambda e Terraform novos contêm contratos e validações; implementação cloud será
+feita em PRs posteriores, sujeita a orçamento e autorização.
