@@ -1143,3 +1143,9 @@ feita em PRs posteriores, sujeita a orçamento e autorização.
 
 [Revisão corretiva: matriz de requisitos, gates e governança](docs/fase3/corrective-review.md).
 Aprovação do bootstrap não representa conclusão da Fase 3; CI atual não executa CD.
+
+## Fase 3 — identidade read-only para Lambda
+
+A migration V10 expõe a view CPF sem alterar autenticação Java. Consulte o
+[contrato e provisionamento de permissões](docs/fase3/auth-identity-view.md).
+O runtime continua HMAC; a integração RS256 permanece bloqueada até migração testada.
