@@ -62,7 +62,7 @@ class DatabaseMigrationIntegrationTest extends PostgresIntegrationTestSupport {
              where conname = 'chk_notification_outbox_status'
             """, String.class);
 
-        assertThat(successfulMigrations).isEqualTo(9);
+        assertThat(successfulMigrations).isEqualTo(10);
         assertThat(tableName).isEqualTo("notification_outbox");
         assertThat(idempotencyTableName).isEqualTo("idempotency_records");
         assertThat(statusConstraint)
