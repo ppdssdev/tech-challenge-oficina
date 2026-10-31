@@ -81,3 +81,15 @@ reinício automático RDS e limites de parada. Não agendar destroy automático 
 RDS futuro: criptografia, acesso privado, backups >=7 dias, deletion protection,
 snapshot final obrigatório, limite de autoscaling storage e teste de restauração.
 Estas são exigências para a próxima implementação, não controles já implantados.
+
+## Limite das interfaces neste bootstrap
+
+`planned_fields` nas duas stacks concorda com a tabela acima, mas contém somente
+nomes. Não há outputs individuais com valores reais, variáveis tipadas de VPC/subnets
+na stack RDS, validação de compatibilidade entre stacks ou parâmetros SSM publicados.
+`integration_contract.schema_version=1` versiona metadados de intenção e
+`implemented=false` deve impedir tratá-los como configuração consumível em deploy.
+A próxima implementação deve definir tipos, validar ambiente/versão e testar
+produtor e consumidor conjuntamente. Não inferir endpoint, ARN ou conectividade de
+um `terraform validate` aprovado. A view/grants auth permanecem pendentes de migração
+na aplicação e de testes PostgreSQL; não foram adicionados nesta revisão.

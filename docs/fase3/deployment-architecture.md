@@ -49,7 +49,7 @@ quando nenhuma chave válida estiver disponível.
 **Estado atual:** API usa `APP_JWT_SECRET` e validador HMAC; esta PR não altera o runtime.
 Uma PR posterior deverá migrar emissão/validação, inclusive login administrativo,
 antes de integrar a Lambda. Não ativar aceitação simultânea indiscriminada HS/RS.
-Token emitido antes da inativação pode durar até 15 min; revogação imediata exigiria
+No contrato futuro, token emitido antes da inativação pode durar até 15 min; revogação imediata exigiria
 consulta/introspecção ou denylist e será decisão explícita.
 
 Chave RSA privada futura por ambiente em Secrets Manager, leitura somente pela
@@ -77,6 +77,54 @@ K3s e AMI na implementação, sem curl|sh sem verificação. RDS privado em subn
 duas AZs, instância inicialmente Single-AZ. Não usar EKS, NAT Gateway ou ALB inicial.
 Single-node/Single-AZ não oferece HA e pode sofrer pressão de memória com observabilidade.
 
-Prometheus/Grafana internos, coleta Actuator autenticada, retenção curta e volumes
-limitados. Logs estruturados com correlation-id e sem CPF/JWT/senha; alarmes futuros
-para erros, latência, saturação, falha de backup e gasto. Endpoint metrics não público.
+**Estado atual do Actuator:** `SecurityConfig` inclui `/actuator/prometheus` em
+`permitAll()`, sem condicionar essa regra a um perfil local. O runtime local permite
+acesso anônimo e `ActuatorSecurityIntegrationTest.shouldExposePrometheusMetricsWithoutJwt`
+exige HTTP 200 e métricas sem JWT. Se esse mesmo runtime for exposto na cloud sem
+restrições adicionais, a rota continuará anônima. Não confundir com `/actuator/metrics`,
+que não aparece na lista pública. Esta correção não muda essa configuração.
+
+**Gate de observabilidade cloud:** antes de expor a aplicação, restringir a rota de
+scrape ao coletor autorizado, via configuração de segurança e rede; impedir acesso
+público por Ingress, Service e porta direta do nó. Validar de fora da rede que
+`/actuator/prometheus` não retorna métricas e, do coletor, que o scrape autorizado
+funciona. Probes de saúde devem continuar operacionais. Registrar testes negativos
+(sem identidade e de origem não autorizada) e positivos, além da configuração aplicada.
+Somente esses resultados poderão demonstrar a restrição cloud — não o CI atual.
+
+Prometheus/Grafana privados, scrape autenticado, retenção curta e volumes limitados
+são requisitos futuros. Logs sem CPF/JWT/senha e alarmes de erros, latência, saturação,
+backup e gasto também precisam implementação e evidência em cloud.
+
+## Gate obrigatório de compatibilidade app ↔ auth
+
+**Gate aberto (não satisfeito): não integrar nem habilitar o fluxo Lambda/API Gateway
+até comprovar os itens abaixo. Aprovação deste bootstrap não fecha o gate.**
+
+O adapter atual `JwtTokenSecurityAdapter` usa `Keys.hmacShaKeyFor`, `signWith` e
+`verifyWith` com segredo compartilhado; sub é username, claim emitida é `roles`
+(lista), e o filtro carrega `UserDetailsService` pelo username e usa suas authorities.
+O default de expiração atual é 120 minutos (`application.yml`), configurável por
+`APP_JWT_EXPIRATION_MINUTES`. Nenhuma dessas propriedades demonstra compatibilidade
+com sub UUID, claim singular `role=CUSTOMER`, TTL 900 s e validação RS256/JWKS futura.
+
+Responsáveis: aplicação (validação, principal e autorização) e auth (emissão e chaves).
+A futura integração exige revisão conjunta e evidências versionadas:
+
+1. Implementar e testar validação RS256 com JWKS confiável, kid, iss/aud por ambiente,
+   exp/nbf/iat e tolerância <=60 s; rejeitar assinatura inválida, none, HMAC indevido,
+   issuer/audience errados, token expirado e chave desconhecida. Testar falha fechada
+   e rotação com cache de chaves. Não apenas configurar uma URI no runtime HMAC.
+2. Mapear UUID de cliente e role CUSTOMER para o principal correto e provar que
+   cliente não acessa endpoints ADMIN; preservar login e autorização administrativos
+   por estratégia de migração explícita, sem confiar no algoritmo declarado pelo token.
+3. Implementar view `auth.customer_identity_v1`, grants read-only e consulta
+   parametrizada com TLS; testar cliente ativo, inativo/ausente, CPF inválido e falha
+   de banco, sem token nos casos de falha. View/grants ainda não existem neste bootstrap.
+4. Executar teste ponta a ponta local com token assinado pelo emissor compatível,
+   validação na API e respostas HTTP de sucesso/recusa; registrar commits dos dois
+   repositórios e versão do contrato. Depois, em tarefa AWS autorizada, repetir com
+   Lambda/API Gateway reais antes de liberar tráfego. Guardar evidência por ambiente.
+
+Os schemas de auth apenas validam formato de request/response; `access_token` é uma
+string opaca. Os cinco testes de contrato não comprovam nenhum dos gates acima.

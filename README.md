@@ -1140,3 +1140,6 @@ CI independente e contratos preparados; **nenhuma infraestrutura AWS implantada*
 
 Lambda e Terraform novos contêm contratos e validações; implementação cloud será
 feita em PRs posteriores, sujeita a orçamento e autorização.
+
+[Revisão corretiva: matriz de requisitos, gates e governança](docs/fase3/corrective-review.md).
+Aprovação do bootstrap não representa conclusão da Fase 3; CI atual não executa CD.

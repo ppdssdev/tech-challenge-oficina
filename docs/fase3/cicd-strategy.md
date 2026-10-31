@@ -64,3 +64,42 @@ PITR/snapshot restaurado em nova instância, validar e trocar endpoint após apr
 RPO/RTO devem ser medidos em ensaio. Lambda: voltar alias à versão testada. Terraform:
 reverter código, gerar novo plano e revisar; nunca restaurar state antigo cegamente.
 Se produção falhar após migração incompatível, interromper promoção e usar runbook.
+
+## Rastreabilidade: SHA testado não é necessariamente HEAD da PR
+
+Os quatro workflows usam `pull_request` e checkout padrão. Nesse evento,
+`GITHUB_REF=refs/pull/<n>/merge` e `GITHUB_SHA`/`github.sha` identificam o commit
+sintético de merge preparado pelo GitHub para testar HEAD + base. O HEAD da PR é
+`github.event.pull_request.head.sha`; a base é `github.event.pull_request.base.sha`.
+O SHA sintético pode mudar quando a base muda, mesmo sem alteração no HEAD da PR.
+Não é prova de merge na main e não deve ser descrito como commit de release.
+Em `push` para main, `GITHUB_SHA` identifica o commit desse push. O metadata
+`head_sha` da API de workflow runs não substitui a identificação do checkout testado.
+[Semântica oficial](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request).
+
+| Resultado atual | Identidade correta e limite |
+|---|---|
+| Auth: `auth-contracts-<GITHUB_SHA>.zip`, checksum e artifact `auth-contracts-<github.sha>` | Em PR, SHA do merge sintético testado; não HEAD da PR. Bundle de contratos, não função Lambda |
+| App: `jacoco-report` | Nome não contém SHA; associar ao repositório, run ID, run attempt e job/commit testado |
+| App: imagem `tech-challenge-oficina:ci` | Tag temporária local ao runner; sem push/registro/promovibilidade comprovada |
+| K3s/RDS | Logs de fmt/validate/Checkov; nenhum artifact de plano ou infraestrutura implantada |
+
+Exemplo real anterior à correção: auth PR #1 HEAD
+`1d3a66524c5486c66c168487c04511286263141a`, [run 41235925327](https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda/actions/runs/41235925327),
+artifact `auth-contracts-2f469cf783afa3764900717e8b6f8fdfba4b4770` (ID 13055345995).
+O segundo SHA identifica o merge de CI, não uma alteração oculta na branch auth.
+Os metadados do run registram o primeiro SHA; o nome do bundle registra o segundo.
+
+Para evidência, guardar juntos: repo, evento, PR, HEAD, base, SHA efetivamente
+checado (`git rev-parse HEAD`/GITHUB_SHA), run ID/attempt/URL, artifact ID/nome e
+checksum do arquivo (ou digest da imagem). No bootstrap esses dados se consultam
+no evento/run, Git e artifact; ainda não há manifesto agregado de proveniência.
+Não promover artifacts de PR. No futuro publicar artefato de release após merge em
+main, registrar essa tupla em manifesto, assinar/atestar proveniência e promover o
+mesmo digest de staging para production. Checksum sozinho não atesta origem.
+
+**CI implementado; CD automático não implementado.** Push main repete validações.
+Environments protegidos são configuração de governança, não execução de deploy.
+O workflow manual Kind cria ambiente descartável local ao runner e não comprova
+staging/production AWS. O desenho de CD acima continua pendente de implementação,
+aprovação, autorização AWS e evidência de execução.

@@ -3,6 +3,12 @@
 Data: 2026-10-31. Bootstrap real de quatro repositórios; nenhum acesso à conta AWS,
 recurso cloud, deploy, secret ou access key. Nenhum merge automático.
 
+> Registro histórico do bootstrap inicial. A [revisão corretiva consolidada](corrective-review.md)
+> atualiza governança, compatibilidade runtime/contratos e matriz de evidências.
+> O avaliador já tem write na aplicação na consulta corretiva; a pendência de acesso
+> descrita abaixo continua somente nos três novos repos. Nenhuma permissão foi
+> alterada pela correção. CI aprovado não equivale a CD ou Fase 3 concluída.
+
 ## Repositórios e PRs
 
 - Aplicação existente: https://github.com/ppdssdev/tech-challenge-oficina
