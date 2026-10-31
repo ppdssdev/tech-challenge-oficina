@@ -12,6 +12,7 @@ public record CustomerResult(
     String email,
     String phone,
     OffsetDateTime createdAt,
+    boolean active,
     OffsetDateTime updatedAt
 ) {
 }

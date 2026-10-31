@@ -99,6 +99,10 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
         );
         assertThat(publicStatus.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(requiredValue(publicStatus, "status")).isEqualTo("DELIVERED");
+        assertThat(jdbcTemplate.queryForList(
+            "select new_status from work_order_status_history where work_order_id = ? order by event_order",
+            String.class, UUID.fromString(orderId)))
+            .containsExactly("RECEIVED", "WAITING_APPROVAL", "IN_EXECUTION", "FINALIZED", "DELIVERED");
     }
 
     @Test
@@ -240,6 +244,7 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
         assertThat(requiredValue(differentPayload, "message"))
             .isEqualTo("Idempotency-Key reutilizada com uma requisição diferente.");
         assertThat(retryWithoutKey.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertSingleExecutionTransition(code);
         assertThat(jdbcTemplate.queryForObject(
             "select quantity_in_stock from parts where id = ?", Integer.class, partId
         )).isEqualTo(8);
@@ -279,6 +284,7 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
                 Integer.class,
                 key
             )).isEqualTo(1);
+        assertSingleExecutionTransition(code);
         } finally {
             executor.shutdownNow();
         }
@@ -390,6 +396,12 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return UUID.fromString(requiredValue(response, "id").toString());
+    }
+
+    private void assertSingleExecutionTransition(String code) {
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from work_order_status_history h join work_orders w on w.id = h.work_order_id where w.code = ? and h.new_status = 'IN_EXECUTION'",
+            Integer.class, code)).isEqualTo(1);
     }
 
     private ResponseEntity<Map<String, Object>> createOrder(HttpHeaders headers, UUID serviceId, UUID partId) {

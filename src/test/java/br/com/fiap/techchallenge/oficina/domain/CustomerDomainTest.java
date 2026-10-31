@@ -11,6 +11,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CustomerDomainTest {
 
     @Test
+    void shouldCreateActiveAndAllowIdempotentStatusChanges() {
+        var customer = new Customer("Maria", DocumentType.CPF, "52998224725", null, null);
+        assertThat(customer.isActive()).isTrue();
+        customer.deactivate();
+        customer.deactivate();
+        customer.update("Maria Silva", DocumentType.CPF, "52998224725", null, null);
+        assertThat(customer.isActive()).isFalse();
+        customer.activate();
+        customer.activate();
+        assertThat(customer.isActive()).isTrue();
+    }
+
+    @Test
     void shouldNormalizeCustomerData() {
         var customer = new Customer(
             " Maria Silva ",

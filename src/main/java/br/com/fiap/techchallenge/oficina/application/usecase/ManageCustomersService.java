@@ -64,8 +64,19 @@ public final class ManageCustomersService implements ManageCustomersUseCase {
     @Override
     public void delete(UUID id) {
         transactions.required(() -> {
-            customers.delete(find(id));
+            var customer = find(id);
+            customer.deactivate();
+            customers.save(customer);
             return null;
+        });
+    }
+
+    @Override
+    public CustomerResult setActive(UUID id, boolean active) {
+        return transactions.required(() -> {
+            var customer = find(id);
+            if (active) customer.activate(); else customer.deactivate();
+            return toResult(customers.save(customer));
         });
     }
 

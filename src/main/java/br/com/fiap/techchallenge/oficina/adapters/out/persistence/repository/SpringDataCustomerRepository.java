@@ -7,5 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SpringDataCustomerRepository extends JpaRepository<CustomerJpaEntity, UUID> {
     Optional<CustomerJpaEntity> findByDocumentNumber(String documentNumber);
+    Optional<CustomerJpaEntity> findByDocumentNumberAndActive(String documentNumber, boolean active);
     boolean existsByDocumentNumber(String documentNumber);
 }

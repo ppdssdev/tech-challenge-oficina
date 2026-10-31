@@ -1,5 +1,6 @@
 package br.com.fiap.techchallenge.oficina.adapters.in.web;
 
+import jakarta.validation.constraints.NotNull;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.customer.CustomerRequest;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.dto.customer.CustomerResponse;
 import br.com.fiap.techchallenge.oficina.adapters.in.web.mapper.WebDtoMapper;
@@ -54,8 +55,16 @@ public class CustomerController {
         return WebDtoMapper.toResponse(service.update(id, WebDtoMapper.toCommand(request)));
     }
 
+    @PutMapping("/{id}/status")
+    @Operation(summary = "Ativa ou inativa cliente")
+    public CustomerResponse setStatus(@PathVariable UUID id, @Valid @RequestBody StatusRequest request) {
+        return WebDtoMapper.toResponse(service.setActive(id, request.active()));
+    }
+
+    public record StatusRequest(@NotNull Boolean active) { }
+
     @DeleteMapping("/{id}")
-    @Operation(summary = "Remove cliente")
+    @Operation(summary = "Inativa cliente preservando seus vínculos")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         service.delete(id);
         return ResponseEntity.noContent().build();

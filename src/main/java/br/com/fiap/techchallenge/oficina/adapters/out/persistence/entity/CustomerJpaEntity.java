@@ -12,6 +12,11 @@ import jakarta.persistence.Table;
 public class CustomerJpaEntity extends JpaBaseEntity {
     @Column(name = "full_name", nullable = false, length = 120)
     private String fullName;
+    @Column(nullable = false)
+    private boolean active = true;
+
+    public boolean isActive() { return active; }
+    public void setActive(boolean active) { this.active = active; }
     @Enumerated(EnumType.STRING)
     @Column(name = "document_type", nullable = false, length = 4)
     private DocumentType documentType;

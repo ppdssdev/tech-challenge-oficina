@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public class Customer extends BaseEntity {
 
+    private boolean active = true;
     private String fullName;
     private DocumentNumber documentNumber;
     private String email;
@@ -25,6 +26,19 @@ public class Customer extends BaseEntity {
         customer.restoreMetadata(id, createdAt, updatedAt);
         return customer;
     }
+
+    public static Customer restore(
+        UUID id, String fullName, DocumentType documentType, String documentNumber, String email, String phone,
+        OffsetDateTime createdAt, OffsetDateTime updatedAt, boolean active
+    ) {
+        var customer = restore(id, fullName, documentType, documentNumber, email, phone, createdAt, updatedAt);
+        customer.active = active;
+        return customer;
+    }
+
+    public boolean isActive() { return active; }
+    public void activate() { active = true; }
+    public void deactivate() { active = false; }
 
     public void update(String fullName, DocumentType documentType, String documentNumber, String email, String phone) {
         if (isBlank(fullName)) {

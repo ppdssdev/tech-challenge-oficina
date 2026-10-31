@@ -9,12 +9,13 @@ public final class CustomerPersistenceMapper {
     public static Customer toDomain(CustomerJpaEntity entity) {
         return Customer.restore(
             entity.getId(), entity.getFullName(), entity.getDocumentType(), entity.getDocumentNumber(),
-            entity.getEmail(), entity.getPhone(), entity.getCreatedAt(), entity.getUpdatedAt()
+            entity.getEmail(), entity.getPhone(), entity.getCreatedAt(), entity.getUpdatedAt(), entity.isActive()
         );
     }
 
     public static void updateEntity(Customer domain, CustomerJpaEntity entity) {
         if (domain.getId() != null) entity.setId(domain.getId());
+        entity.setActive(domain.isActive());
         entity.setFullName(domain.getFullName());
         entity.setDocumentType(domain.getDocumentType());
         entity.setDocumentNumber(domain.getDocumentNumber());

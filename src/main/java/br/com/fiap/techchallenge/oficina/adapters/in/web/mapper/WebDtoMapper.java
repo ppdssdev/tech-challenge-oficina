@@ -48,7 +48,7 @@ public final class WebDtoMapper {
     public static CustomerResponse toResponse(CustomerResult customer) {
         return new CustomerResponse(
             customer.id(), customer.fullName(), customer.documentType(), customer.documentNumber(),
-            customer.email(), customer.phone(), customer.createdAt(), customer.updatedAt()
+            customer.email(), customer.phone(), customer.createdAt(), customer.active(), customer.updatedAt()
         );
     }
 
