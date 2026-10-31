@@ -39,6 +39,31 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
     @Autowired
     NotificationOutboxPort notificationOutbox;
 
+    @Autowired
+    br.com.fiap.techchallenge.oficina.application.port.out.AppUserRepositoryPort users;
+
+    @Autowired
+    org.springframework.security.crypto.password.PasswordEncoder passwords;
+
+    @Test
+    void shouldReturnForbiddenForRealCustomerJwt() {
+        String username = "customer-" + UUID.randomUUID();
+        users.save(new br.com.fiap.techchallenge.oficina.domain.model.user.AppUser(
+            username, passwords.encode("Customer-Test-42!"), "CUSTOMER"));
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            var auth = restTemplate.exchange(url("/api/v1/auth/login"), HttpMethod.POST,
+                new HttpEntity<>(Map.of("username", username, "password", "Customer-Test-42!"), headers), JSON_OBJECT);
+            assertThat(auth.getStatusCode()).isEqualTo(HttpStatus.OK);
+            var response = restTemplate.exchange(url("/api/v1/admin/work-orders"), HttpMethod.GET,
+                new HttpEntity<Void>(null, adminHeaders(requiredValue(auth, "accessToken").toString())), String.class);
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        } finally {
+            jdbcTemplate.update("delete from app_users where username = ?", username);
+        }
+    }
+
     @Test
     void shouldRunMainWorkOrderFlowThroughRestApi() {
         String token = login();

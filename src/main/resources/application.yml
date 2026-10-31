@@ -7,7 +7,7 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/oficina_db}
     username: ${SPRING_DATASOURCE_USERNAME:oficina}
-    password: ${SPRING_DATASOURCE_PASSWORD:oficina}
+    password: ${SPRING_DATASOURCE_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate

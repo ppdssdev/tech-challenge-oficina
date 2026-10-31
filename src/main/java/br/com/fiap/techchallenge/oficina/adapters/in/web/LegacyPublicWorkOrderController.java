@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Deprecated(forRemoval = true)
-@Profile("local")
+@Profile("local & !prod & !production")
 @RestController
 @RequestMapping("/api/v1/public/work-orders")
 public class LegacyPublicWorkOrderController {

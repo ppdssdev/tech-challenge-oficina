@@ -35,6 +35,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 public class ApiExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+    private static final Logger diagnostics = LoggerFactory.getLogger("oficina.restricted.diagnostics");
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(NotFoundException ex, HttpServletRequest request) {
@@ -191,24 +192,33 @@ public class ApiExceptionHandler {
             Exception ex
     ) {
         String traceId = traceId(request);
+        Object route = request.getAttribute(org.springframework.web.servlet.HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        String safePath = route instanceof String pattern ? PiiMasker.mask(pattern) : "[unmatched]";
 
         if (status.is5xxServerError()) {
             log.error(
                     "Erro inesperado na API. traceId={} status={} path={} exception={} message={}",
                     traceId,
                     status.value(),
-                    request.getRequestURI(),
+                    safePath,
                     ex.getClass().getSimpleName(),
-                    PiiMasker.mask(message)
+                    "Erro interno"
             );
+            // Only application stack locations; no exception message, cause, request or payload.
+            String frames = Arrays.stream(ex.getStackTrace())
+                .filter(frame -> frame.getClassName().startsWith("br.com.fiap.techchallenge.oficina."))
+                .limit(12)
+                .map(frame -> frame.getClassName() + "." + frame.getMethodName() + ":" + frame.getLineNumber())
+                .collect(Collectors.joining(";"));
+            diagnostics.error("traceId={} type={} frames={}", traceId, ex.getClass().getSimpleName(), frames);
         } else {
             log.warn(
                     "Erro tratado na API. traceId={} status={} path={} exception={} message={}",
                     traceId,
                     status.value(),
-                    request.getRequestURI(),
+                    safePath,
                     ex.getClass().getSimpleName(),
-                    PiiMasker.mask(ex.getMessage())
+                    "Detalhes de entrada omitidos"
             );
         }
 
@@ -217,7 +227,7 @@ public class ApiExceptionHandler {
                 status.value(),
                 status.getReasonPhrase(),
                 message,
-                request.getRequestURI(),
+                safePath,
                 traceId,
                 fields
         ));
@@ -226,7 +236,8 @@ public class ApiExceptionHandler {
     private String traceId(HttpServletRequest request) {
         String correlationId = request.getHeader("X-Correlation-Id");
 
-        if (correlationId != null && !correlationId.isBlank()) {
+        if (correlationId != null && correlationId.matches("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}")
+            && !correlationId.matches(".*[0-9]{11,}.*")) {
             return correlationId;
         }
 
