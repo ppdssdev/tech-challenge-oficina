@@ -11,8 +11,14 @@ recurso cloud, deploy, secret ou access key. Nenhum merge automático.
 - Criado: https://github.com/ppdssdev/tech-challenge-oficina-infra-rds
 
 Novos repos inicializados com README mínimo; bootstrap em PRs subsequentes.
-Branch comum: feature/fase3-multirepo-bootstrap. Links de PR e CI registrados na
-entrega e nas descrições das PRs; resultados remotos são verificáveis na aba Checks.
+Branch comum: feature/fase3-multirepo-bootstrap. PRs abertas (sem merge):
+
+- [Aplicação #3](https://github.com/ppdssdev/tech-challenge-oficina/pull/3)
+- [Auth #1](https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda/pull/1)
+- [K3s #1](https://github.com/ppdssdev/tech-challenge-oficina-infra-k3s/pull/1)
+- [RDS #1](https://github.com/ppdssdev/tech-challenge-oficina-infra-rds/pull/1)
+
+Resultados remotos são verificáveis na aba Checks de cada PR.
 
 ## Validação local
 
