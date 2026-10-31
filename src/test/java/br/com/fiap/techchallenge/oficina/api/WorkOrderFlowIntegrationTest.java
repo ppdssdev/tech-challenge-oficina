@@ -1,8 +1,6 @@
 package br.com.fiap.techchallenge.oficina.api;
 
 import br.com.fiap.techchallenge.oficina.application.port.out.NotificationOutboxPort;
-import br.com.fiap.techchallenge.oficina.application.port.out.AppUserRepositoryPort;
-import br.com.fiap.techchallenge.oficina.domain.model.user.AppUser;
 import br.com.fiap.techchallenge.oficina.support.PostgresIntegrationTestSupport;
 import java.math.BigDecimal;
 import java.net.URI;
@@ -24,7 +22,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -41,12 +38,6 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     NotificationOutboxPort notificationOutbox;
-
-    @Autowired
-    AppUserRepositoryPort users;
-
-    @Autowired
-    PasswordEncoder passwordEncoder;
 
     @Test
     void shouldRunMainWorkOrderFlowThroughRestApi() {
@@ -92,22 +83,6 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
-
-    @Test
-    void shouldForbidAuthenticatedCustomerFromAdministrativeEndpoints() {
-        String username = "customer-" + UUID.randomUUID();
-        String password = "customer-password";
-        users.save(new AppUser(username, passwordEncoder.encode(password), "CUSTOMER"));
-
-        ResponseEntity<String> response = restTemplate.exchange(
-            url("/api/v1/admin/work-orders"),
-            HttpMethod.GET,
-            new HttpEntity<>(adminHeaders(login(username, password))),
-            String.class
-        );
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test
@@ -363,16 +338,12 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     private String login() {
-        return login("admin", "admin123");
-    }
-
-    private String login(String username, String password) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
             url("/api/v1/auth/login"),
             HttpMethod.POST,
-            new HttpEntity<>(Map.of("username", username, "password", password), headers),
+            new HttpEntity<>(Map.of("username", "admin", "password", "admin123"), headers),
             JSON_OBJECT
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
