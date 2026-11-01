@@ -21,7 +21,7 @@ public final class FinishWorkOrderService implements FinishWorkOrderUseCase {
     @Override
     public WorkOrderResult finish(UUID id) {
         return transactions.required(() -> {
-            var order = workOrders.findDetailedById(id)
+            var order = workOrders.findDetailedByIdForUpdate(id)
                 .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
             order.finish();
             return toResult(workOrders.save(order));

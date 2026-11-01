@@ -1,5 +1,6 @@
 package br.com.fiap.techchallenge.oficina.adapters.out.persistence;
 
+import br.com.fiap.techchallenge.oficina.application.port.in.result.CustomerWorkOrderResult;
 import br.com.fiap.techchallenge.oficina.adapters.out.persistence.repository.SpringDataWorkOrderStatusHistoryRepository;
 import br.com.fiap.techchallenge.oficina.adapters.out.persistence.entity.WorkOrderStatusHistoryJpaEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,7 +71,17 @@ public class WorkOrderPersistenceAdapter implements WorkOrderRepositoryPort {
 
     @Override public boolean existsByCode(String code) { return repository.existsByCode(code); }
     @Override public Optional<WorkOrder> findByCode(String code) { return repository.findByCode(code).map(entity -> WorkOrderPersistenceMapper.toDomain(entity, false)); }
-    @Override public Optional<WorkOrder> findDetailedById(UUID id) { return detailed(id).map(entity -> WorkOrderPersistenceMapper.toDomain(entity, true)); }
+    @Override public Optional<WorkOrder> findDetailedById(UUID id) { return detailed(id, false).map(entity -> WorkOrderPersistenceMapper.toDomain(entity, true)); }
+
+    @Override
+    public Optional<WorkOrder> findDetailedByIdForUpdate(UUID id) {
+        return detailed(id, true).map(entity -> WorkOrderPersistenceMapper.toDomain(entity, true));
+    }
+
+    @Override
+    public Optional<CustomerWorkOrderResult> findForCustomer(UUID id, UUID customerId) {
+        return repository.findForCustomer(id, customerId);
+    }
 
     @Override
     public Optional<WorkOrder> findDetailedByIdForStockUpdate(UUID id) {
@@ -93,8 +104,8 @@ public class WorkOrderPersistenceAdapter implements WorkOrderRepositoryPort {
     @Override public List<WorkOrder> findCompletedForMetricsTo(OffsetDateTime to) { return summaries(repository.findCompletedForMetricsTo(to)); }
     @Override public List<WorkOrder> findCompletedForMetricsBetween(OffsetDateTime from, OffsetDateTime to) { return summaries(repository.findCompletedForMetricsBetween(from, to)); }
 
-    private Optional<WorkOrderJpaEntity> detailed(UUID id) {
-        var entity = repository.findByIdForUpdate(id);
+    private Optional<WorkOrderJpaEntity> detailed(UUID id, boolean forUpdate) {
+        var entity = forUpdate ? repository.findByIdForUpdate(id) : repository.findDetailedById(id);
         if (entity.isPresent()) {
             repository.loadServiceItems(id);
             repository.loadPartItems(id);
@@ -103,7 +114,7 @@ public class WorkOrderPersistenceAdapter implements WorkOrderRepositoryPort {
     }
 
     private WorkOrderJpaEntity loadDetailedEntity(UUID id) {
-        return detailed(id).orElseThrow(() -> new IllegalStateException("OS removida durante a transação."));
+        return detailed(id, true).orElseThrow(() -> new IllegalStateException("OS removida durante a transação."));
     }
 
     private List<WorkOrder> summaries(List<WorkOrderJpaEntity> entities) {

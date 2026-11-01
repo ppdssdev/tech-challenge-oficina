@@ -16,6 +16,7 @@ import static org.assertj.core.api.Assertions.*;
 class CustomerStatusAndHistoryIntegrationTest extends PostgresIntegrationTestSupport {
     @Autowired CustomerRepositoryPort customers;
     @Autowired ManageCustomersUseCase manageCustomers;
+    @Autowired br.com.fiap.techchallenge.oficina.application.port.in.StartDiagnosisUseCase startDiagnosis;
     @Autowired VehicleRepositoryPort vehicles;
     @Autowired WorkOrderRepositoryPort orders;
     @Autowired WorkOrderStatusHistoryPort history;
@@ -46,7 +47,7 @@ class CustomerStatusAndHistoryIntegrationTest extends PostgresIntegrationTestSup
         assertThat(creation.getFirst().newStatus()).isEqualTo(WorkOrderStatus.RECEIVED);
         assertThat(creation.getFirst().occurredAt()).isNotNull();
         tx.required(() -> {
-            var loaded = orders.findDetailedById(order.getId()).orElseThrow();
+            var loaded = orders.findDetailedByIdForUpdate(order.getId()).orElseThrow();
             assertThat(loaded.getStatusTransitions()).isEmpty();
             loaded.startDiagnosis("Diagnosis");
             orders.save(loaded);
@@ -65,7 +66,7 @@ class CustomerStatusAndHistoryIntegrationTest extends PostgresIntegrationTestSup
     void shouldRollBackStatusAndHistoryTogether() {
         var order = createOrder();
         assertThatThrownBy(() -> tx.required(() -> {
-            var loaded = orders.findDetailedById(order.getId()).orElseThrow();
+            var loaded = orders.findDetailedByIdForUpdate(order.getId()).orElseThrow();
             loaded.startDiagnosis("Diagnosis");
             orders.save(loaded);
             throw new IllegalStateException("Force rollback after flush");
@@ -80,7 +81,7 @@ class CustomerStatusAndHistoryIntegrationTest extends PostgresIntegrationTestSup
         jdbcTemplate.execute("alter table work_order_status_history add constraint test_reject_diagnosis check (new_status <> 'IN_DIAGNOSIS')");
         try {
             assertThatThrownBy(() -> tx.required(() -> {
-                var loaded = orders.findDetailedById(order.getId()).orElseThrow();
+                var loaded = orders.findDetailedByIdForUpdate(order.getId()).orElseThrow();
                 loaded.startDiagnosis("Diagnosis");
                 return orders.save(loaded);
             })).isInstanceOf(RuntimeException.class);
@@ -100,7 +101,7 @@ class CustomerStatusAndHistoryIntegrationTest extends PostgresIntegrationTestSup
                 barrier.await(10, TimeUnit.SECONDS);
                 try {
                     return tx.required(() -> {
-                        var loaded = orders.findDetailedById(order.getId()).orElseThrow();
+                        var loaded = orders.findDetailedByIdForUpdate(order.getId()).orElseThrow();
                         loaded.startDiagnosis("Diagnosis");
                         orders.save(loaded);
                         return true;
@@ -110,6 +111,26 @@ class CustomerStatusAndHistoryIntegrationTest extends PostgresIntegrationTestSup
             var first = executor.submit(transition);
             var second = executor.submit(transition);
             assertThat(java.util.List.of(first.get(15, TimeUnit.SECONDS), second.get(15, TimeUnit.SECONDS)))
+                .containsExactlyInAnyOrder(true, false);
+        }
+        assertThat(history.findByWorkOrderId(order.getId())).hasSize(2);
+    }
+
+    @Test
+    void shouldSerializeConcurrentTransitionsThroughUseCase() throws Exception {
+        var order = createOrder();
+        var barrier = new CyclicBarrier(2);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Callable<Boolean> transition = () -> {
+                barrier.await(5, TimeUnit.SECONDS);
+                try {
+                    startDiagnosis.start(order.getId(), "Diagnosis");
+                    return true;
+                } catch (BusinessException expected) { return false; }
+            };
+            var first = executor.submit(transition);
+            var second = executor.submit(transition);
+            assertThat(java.util.List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
                 .containsExactlyInAnyOrder(true, false);
         }
         assertThat(history.findByWorkOrderId(order.getId())).hasSize(2);

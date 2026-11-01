@@ -33,7 +33,7 @@ public final class AddWorkOrderItemsService implements AddWorkOrderItemsUseCase 
     @Override
     public WorkOrderResult add(UUID id, Command command) {
         return transactions.required(() -> {
-            var order = workOrders.findDetailedById(id)
+            var order = workOrders.findDetailedByIdForUpdate(id)
                 .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
             boolean hasServices = command.services() != null && !command.services().isEmpty();
             boolean hasParts = command.parts() != null && !command.parts().isEmpty();

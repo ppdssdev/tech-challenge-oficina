@@ -21,7 +21,7 @@ public final class DeliverWorkOrderService implements DeliverWorkOrderUseCase {
     @Override
     public WorkOrderResult deliver(UUID id) {
         return transactions.required(() -> {
-            var order = workOrders.findDetailedById(id)
+            var order = workOrders.findDetailedByIdForUpdate(id)
                 .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
             order.deliver();
             return toResult(workOrders.save(order));
