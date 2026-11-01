@@ -1149,3 +1149,11 @@ Aprovação do bootstrap não representa conclusão da Fase 3; CI atual não exe
 A migration V10 expõe a view CPF sem alterar autenticação Java. Consulte o
 [contrato e provisionamento de permissões](docs/fase3/auth-identity-view.md).
 O runtime continua HMAC; a integração RS256 permanece bloqueada até migração testada.
+
+### Fase 3 — CUSTOMER JWT RS256
+
+A API aceita JWTs da Lambda em `GET /api/v1/customer/work-orders/{id}`, com autorização pelo proprietário persistido e resposta mínima. ADMIN mantém HMAC em cadeia separada.
+
+Configure `CUSTOMER_JWKS_URI`, `CUSTOMER_JWT_ISSUER`, `CUSTOMER_JWT_AUDIENCE` com valores reais do ambiente; HTTPS é obrigatório fora de local/test/it. Skew: `CUSTOMER_JWT_CLOCK_SKEW_SECONDS` (0–60); cache: `CUSTOMER_JWKS_CACHE_SECONDS` (1–300). Produção falha ao iniciar sem configuração confiável. Local sem configuração rejeita CUSTOMER.
+
+[Arquitetura, diagrama, configuração e testes Python → Spring](docs/fase3/customer-rs256-integration.md) · [ADR](docs/adr/0005-admin-customer-trust-domains.md).

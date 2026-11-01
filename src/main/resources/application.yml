@@ -56,6 +56,12 @@ management:
         enabled: true
 
 app:
+  customer-auth:
+    jwks-uri: ${CUSTOMER_JWKS_URI:}
+    issuer: ${CUSTOMER_JWT_ISSUER:}
+    audience: ${CUSTOMER_JWT_AUDIENCE:}
+    clock-skew-seconds: ${CUSTOMER_JWT_CLOCK_SKEW_SECONDS:60}
+    cache-seconds: ${CUSTOMER_JWKS_CACHE_SECONDS:300}
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
   notification:
     outbox:

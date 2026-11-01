@@ -48,3 +48,7 @@ Compose publica portas somente em 127.0.0.1. Ainda usa credenciais demonstrativa
 - consulta pública usa JSON e não coloca documento na query string;
 - GET legado existe somente em `local` e está deprecated;
 - migrations, domínio de OS e regras de estoque permanecem inalterados.
+
+## Prompt 05 — CUSTOMER RS256
+
+[Contrato e controles CUSTOMER](customer-rs256-integration.md): validação criptográfica Nimbus, cadeias por rota sem fallback, principal UUID e autorização pelo proprietário persistido com 404 uniforme. Registro servlet do filtro legado desabilitado; controles administrativos da PR #1 preservados. [ADR da separação temporária](../adr/0005-admin-customer-trust-domains.md).

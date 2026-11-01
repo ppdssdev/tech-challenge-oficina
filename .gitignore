@@ -56,3 +56,8 @@ temp/
 *.tmp
 *.swp
 *.swo
+
+# Python integration fixtures
+__pycache__/
+*.pyc
+.venv/

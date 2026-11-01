@@ -8,6 +8,7 @@ import br.com.fiap.techchallenge.oficina.application.port.out.WorkOrderRepositor
 import br.com.fiap.techchallenge.oficina.domain.exception.NotFoundException;
 import br.com.fiap.techchallenge.oficina.domain.service.DocumentValidator;
 import java.util.UUID;
+import br.com.fiap.techchallenge.oficina.application.port.in.result.CustomerWorkOrderResult;
 
 import static br.com.fiap.techchallenge.oficina.application.usecase.mapper.ApplicationResultMapper.toPublicStatusResult;
 import static br.com.fiap.techchallenge.oficina.application.usecase.mapper.ApplicationResultMapper.toResult;
@@ -20,6 +21,16 @@ public final class GetWorkOrderService implements GetWorkOrderUseCase {
     public GetWorkOrderService(WorkOrderRepositoryPort workOrders, TransactionPort transactions) {
         this.workOrders = workOrders;
         this.transactions = transactions;
+    }
+
+    @Override
+    public CustomerWorkOrderResult getForCustomer(UUID id, UUID authenticatedCustomerId) {
+        return transactions.required(() -> {
+            var order = workOrders.findDetailedById(id)
+                .filter(found -> found.getCustomer().getId().equals(authenticatedCustomerId))
+                .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
+            return new CustomerWorkOrderResult(order.getId(), order.getCode(), order.getStatus(), order.getTotalAmount());
+        });
     }
 
     @Override
