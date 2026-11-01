@@ -66,7 +66,7 @@ python3 -m venv /tmp/customer-issuer-venv
 CUSTOMER_TEST_PYTHON=/tmp/customer-issuer-venv/bin/python mvn -B clean verify
 ```
 
-`src/test/python/auth` contém cópia exata dos módulos necessários do commit Python, com proveniência. `tokens.py` gera RSA descartável em memória e chama RS256Signer.sign para o token positivo. Os negativos derivam do contrato e são assinados em Python. Não há chave privada persistida, token real ou dependência AWS. CustomerJwtIntegrationTest inicia servidor JWKS controlado e usa HTTP real contra Spring em porta aleatória, persistindo Customer/Vehicle/WorkOrder em PostgreSQL 16 via Testcontainers. Testa acesso próprio, 404 de terceiros/ausente, login admin, isolamento bidirecional, adulteração, claims ausentes/incorretas, algoritmos indevidos, cache, rotação, indisponibilidade e endpoints públicos. A CI instala as dependências Python antes de executar Maven; JaCoCo mantém o gate de 80% nos pacotes de domínio.
+`src/test/python/auth` contém cópia exata dos módulos necessários do commit Python, com proveniência. `tokens.py` gera RSA descartável em memória e chama RS256Signer.sign para o token positivo. Os negativos derivam do contrato e são assinados em Python. Não há chave privada persistida, token real ou dependência AWS. CustomerJwtIntegrationTest inicia servidor JWKS controlado e usa HTTP real contra Spring em porta aleatória, persistindo Customer/Vehicle/WorkOrder em PostgreSQL 16 via Testcontainers. Testa acesso próprio, 404 de terceiros/ausente, login admin, isolamento bidirecional, adulteração, claims ausentes/incorretas, algoritmos indevidos, cache, rotação, indisponibilidade e endpoints públicos. A CI usa Python 3.13, compatível com o runtime da Lambda, e instala as dependências Python antes de executar Maven; JaCoCo mantém o gate de 80% nos pacotes de domínio.
 
 ## Riscos e próxima etapa
 
@@ -74,7 +74,7 @@ CPF sozinho não comprova identidade: o mecanismo do emissor precisa evoluir par
 
 ## Evidência de execução local
 
-Execução de `mvn -B clean verify` com CUSTOMER_TEST_PYTHON apontando para venv: 145 testes, zero falhas, zero erros, zero ignorados; BUILD SUCCESS. PostgreSQL 16.15 em Testcontainers; migrations V1–V10 aplicadas e testes de migração aprovados. Gate JaCoCo aprovado: pacotes de domínio entre 84,6% e 100% de linhas.
+Execução local com Python 3.12.3 (a CI fixa Python 3.13) de `mvn -B clean verify` com CUSTOMER_TEST_PYTHON apontando para venv: 145 testes, zero falhas, zero erros, zero ignorados; BUILD SUCCESS. PostgreSQL 16.15 em Testcontainers; migrations V1–V10 aplicadas e testes de migração aprovados. Gate JaCoCo aprovado: pacotes de domínio entre 84,6% e 100% de linhas.
 
 CustomerJwtIntegrationTest: 5 cenários HTTP aprovados, incluindo matriz de tokens negativos. Token positivo produzido por RS256Signer → endpoint próprio 200; mesmo endpoint com identidade de outro cliente 404; UUID inexistente 404; CUSTOMER → ADMIN 401; login ADMIN → endpoint administrativo 200; ADMIN → CUSTOMER 401. Outage de JWKS com cache expirado retorna 401 Bearer diretamente, sem dispatch de erro à cadeia administrativa.
 

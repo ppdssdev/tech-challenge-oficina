@@ -31,6 +31,11 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Set up Python 3.13 (Lambda contract)
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.13"
+
       - name: Install Python issuer test dependencies
         run: |
           python3 -m venv /tmp/customer-issuer-venv
