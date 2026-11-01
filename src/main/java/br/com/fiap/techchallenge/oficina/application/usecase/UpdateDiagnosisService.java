@@ -21,7 +21,7 @@ public final class UpdateDiagnosisService implements UpdateDiagnosisUseCase {
     @Override
     public WorkOrderResult update(UUID id, String notes) {
         return transactions.required(() -> {
-            var order = workOrders.findDetailedById(id)
+            var order = workOrders.findDetailedByIdForUpdate(id)
                 .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
             order.updateDiagnosticNotes(notes);
             return toResult(workOrders.save(order));

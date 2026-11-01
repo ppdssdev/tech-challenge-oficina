@@ -29,7 +29,7 @@ public final class StartDiagnosisService implements StartDiagnosisUseCase {
     }
 
     private WorkOrder find(UUID id) {
-        return workOrders.findDetailedById(id)
+        return workOrders.findDetailedByIdForUpdate(id)
             .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
     }
 }

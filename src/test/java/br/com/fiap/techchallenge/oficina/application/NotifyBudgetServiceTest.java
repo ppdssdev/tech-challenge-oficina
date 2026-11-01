@@ -45,7 +45,7 @@ class NotifyBudgetServiceTest {
     void shouldEnqueuePendingMailpitNotificationWithoutChangingWorkOrderStatus() {
         UUID id = UUID.randomUUID();
         var order = waitingApprovalOrder("maria@email.com");
-        when(workOrderRepository.findDetailedById(id)).thenReturn(Optional.of(order));
+        when(workOrderRepository.findDetailedByIdForUpdate(id)).thenReturn(Optional.of(order));
         when(outboxPort.enqueueBudgetDecision(any())).thenAnswer(invocation -> invocation.getArgument(0));
         var useCase = new NotifyBudgetService(
             workOrderRepository, outboxPort, transactions, "http://localhost:8080/"
@@ -77,7 +77,7 @@ class NotifyBudgetServiceTest {
     void shouldRejectNotificationWhenWorkOrderIsNotWaitingForApproval() {
         UUID id = UUID.randomUUID();
         var order = receivedOrder("maria@email.com");
-        when(workOrderRepository.findDetailedById(id)).thenReturn(Optional.of(order));
+        when(workOrderRepository.findDetailedByIdForUpdate(id)).thenReturn(Optional.of(order));
         var useCase = new NotifyBudgetService(
             workOrderRepository, outboxPort, transactions, "http://localhost:8080"
         );
@@ -92,7 +92,7 @@ class NotifyBudgetServiceTest {
     @Test
     void shouldRejectNotificationWhenWorkOrderDoesNotExist() {
         UUID id = UUID.randomUUID();
-        when(workOrderRepository.findDetailedById(id)).thenReturn(Optional.empty());
+        when(workOrderRepository.findDetailedByIdForUpdate(id)).thenReturn(Optional.empty());
         var useCase = new NotifyBudgetService(
             workOrderRepository, outboxPort, transactions, "http://localhost:8080"
         );
@@ -108,7 +108,7 @@ class NotifyBudgetServiceTest {
     void shouldRejectNotificationWhenCustomerHasNoEmail() {
         UUID id = UUID.randomUUID();
         var order = waitingApprovalOrder(null);
-        when(workOrderRepository.findDetailedById(id)).thenReturn(Optional.of(order));
+        when(workOrderRepository.findDetailedByIdForUpdate(id)).thenReturn(Optional.of(order));
         var useCase = new NotifyBudgetService(
             workOrderRepository, outboxPort, transactions, "http://localhost:8080"
         );

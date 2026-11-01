@@ -34,7 +34,7 @@ public final class NotifyBudgetService implements NotifyBudgetUseCase {
     @Override
     public BudgetNotificationResult notifyBudget(UUID workOrderId) {
         return transactions.required(() -> {
-            var order = workOrders.findDetailedById(workOrderId)
+            var order = workOrders.findDetailedByIdForUpdate(workOrderId)
                 .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
             if (order.getStatus() != WorkOrderStatus.WAITING_APPROVAL) {
                 throw new BusinessException("Somente OS aguardando aprovação pode ter o orçamento notificado.");

@@ -25,12 +25,8 @@ public final class GetWorkOrderService implements GetWorkOrderUseCase {
 
     @Override
     public CustomerWorkOrderResult getForCustomer(UUID id, UUID authenticatedCustomerId) {
-        return transactions.required(() -> {
-            var order = workOrders.findDetailedById(id)
-                .filter(found -> found.getCustomer().getId().equals(authenticatedCustomerId))
-                .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada."));
-            return new CustomerWorkOrderResult(order.getId(), order.getCode(), order.getStatus(), order.getTotalAmount());
-        });
+        return transactions.required(() -> workOrders.findForCustomer(id, authenticatedCustomerId)
+            .orElseThrow(() -> new NotFoundException("Ordem de serviço não encontrada.")));
     }
 
     @Override

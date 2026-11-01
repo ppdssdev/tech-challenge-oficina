@@ -1,5 +1,6 @@
 package br.com.fiap.techchallenge.oficina.adapters.out.persistence.repository;
 
+import br.com.fiap.techchallenge.oficina.application.port.in.result.CustomerWorkOrderResult;
 import br.com.fiap.techchallenge.oficina.adapters.out.persistence.entity.WorkOrderJpaEntity;
 import br.com.fiap.techchallenge.oficina.domain.model.workorder.WorkOrderStatus;
 import jakarta.persistence.LockModeType;
@@ -15,6 +16,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface SpringDataWorkOrderRepository extends JpaRepository<WorkOrderJpaEntity, UUID> {
     boolean existsByCode(String code);
+
+    @Query("""
+        select new br.com.fiap.techchallenge.oficina.application.port.in.result.CustomerWorkOrderResult(
+            w.id, w.code, w.status, w.totalAmount)
+        from WorkOrderJpaEntity w where w.id = :id and w.customer.id = :customerId
+        """)
+    Optional<CustomerWorkOrderResult> findForCustomer(
+        @Param("id") UUID id, @Param("customerId") UUID customerId);
 
     @EntityGraph(attributePaths = {"customer", "vehicle", "vehicle.customer"})
     Optional<WorkOrderJpaEntity> findByCode(String code);

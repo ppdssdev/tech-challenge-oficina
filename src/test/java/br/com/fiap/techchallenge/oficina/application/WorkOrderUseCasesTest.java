@@ -59,7 +59,7 @@ class WorkOrderUseCasesTest {
     void shouldRejectAddItemsWhenRequestHasNoItems() {
         UUID id = UUID.randomUUID();
         var order = sampleOrder();
-        when(workOrderRepository.findDetailedById(id)).thenReturn(Optional.of(order));
+        when(workOrderRepository.findDetailedByIdForUpdate(id)).thenReturn(Optional.of(order));
         var useCase = new AddWorkOrderItemsService(
             workOrderRepository, serviceCatalogRepository, partRepository, transactions
         );

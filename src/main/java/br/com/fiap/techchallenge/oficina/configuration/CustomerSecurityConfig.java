@@ -1,7 +1,12 @@
 package br.com.fiap.techchallenge.oficina.configuration;
 
 import br.com.fiap.techchallenge.oficina.adapters.out.security.CustomerIdentity;
-import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Ticker;
+import br.com.fiap.techchallenge.oficina.adapters.out.security.BoundedJwksSource;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.proc.JWSVerificationKeySelector;
+import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -9,7 +14,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -22,7 +26,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.*;
-import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.client.RestTemplate;
@@ -30,12 +33,15 @@ import org.springframework.web.client.RestTemplate;
 @Configuration
 public class CustomerSecurityConfig {
     @Bean
+    Ticker customerJwksTicker() { return Ticker.systemTicker(); }
+
+    @Bean
     JwtDecoder customerDecoder(Environment environment,
         @Value("${app.customer-auth.jwks-uri:}") String jwks,
         @Value("${app.customer-auth.issuer:}") String issuer,
         @Value("${app.customer-auth.audience:}") String audience,
         @Value("${app.customer-auth.clock-skew-seconds:60}") long skew,
-        @Value("${app.customer-auth.cache-seconds:300}") long cacheSeconds) {
+        @Value("${app.customer-auth.cache-seconds:300}") long cacheSeconds, Ticker customerJwksTicker) {
         boolean local = environment.acceptsProfiles(Profiles.of("local", "test", "it"))
             && !environment.acceptsProfiles(Profiles.of("production", "staging", "cloud"));
         if (jwks.isBlank() && issuer.isBlank() && audience.isBlank() && local) {
@@ -48,12 +54,13 @@ public class CustomerSecurityConfig {
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NEVER).connectTimeout(Duration.ofSeconds(2)).build());
         factory.setReadTimeout(Duration.ofSeconds(2));
-        var decoder = NimbusJwtDecoder.withJwkSetUri(jwks)
-            .jwsAlgorithm(SignatureAlgorithm.RS256)
-            .restOperations(new RestTemplate(factory))
-            .cache(new CaffeineCache("customer-jwks", Caffeine.newBuilder().maximumSize(1)
-                .expireAfterWrite(Duration.ofSeconds(cacheSeconds)).build()))
-            .build();
+        var source = new BoundedJwksSource(new RestTemplate(factory), URI.create(jwks),
+            Duration.ofSeconds(cacheSeconds), customerJwksTicker);
+        var processor = new DefaultJWTProcessor<SecurityContext>();
+        processor.setJWSKeySelector(new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, source));
+        // As in Spring's builder, claims validation belongs to the validators below.
+        processor.setJWTClaimsSetVerifier((claims, context) -> { });
+        var decoder = new NimbusJwtDecoder(processor);
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
             new JwtTimestampValidator(Duration.ofSeconds(skew)), new JwtIssuerValidator(issuer),
             jwt -> validateContract(jwt, audience, skew)));
