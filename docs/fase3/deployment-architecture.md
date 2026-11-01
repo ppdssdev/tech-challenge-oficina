@@ -128,3 +128,7 @@ A futura integração exige revisão conjunta e evidências versionadas:
 
 Os schemas de auth apenas validam formato de request/response; `access_token` é uma
 string opaca. Os cinco testes de contrato não comprovam nenhum dos gates acima.
+
+## Integração Lambda / Spring
+
+O fluxo e o diagrama Mermaid da [integração CUSTOMER RS256](customer-rs256-integration.md) descrevem os dois domínios de confiança, cache/rotação JWKS e autorização de WorkOrder. A futura infraestrutura deve publicar o JWKS real via HTTPS e fornecer as variáveis CUSTOMER; a chave privada permanece exclusivamente com o emissor. Nenhum provisionamento AWS faz parte desta alteração.

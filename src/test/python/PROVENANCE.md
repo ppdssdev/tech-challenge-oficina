@@ -1,0 +1,1 @@
+auth/jwt.py, auth/ports.py e auth/__init__.py copiados sem alterações de ppdssdev/tech-challenge-oficina-auth-lambda commit bbbf36eecd57a4f35e1792702a13264a7d74ea75. Apenas fixtures de teste; chaves geradas em memória a cada execução.

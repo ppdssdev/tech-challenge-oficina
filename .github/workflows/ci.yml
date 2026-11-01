@@ -31,6 +31,12 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Install Python issuer test dependencies
+        run: |
+          python3 -m venv /tmp/customer-issuer-venv
+          /tmp/customer-issuer-venv/bin/pip install -r src/test/python/requirements.txt
+          echo "CUSTOMER_TEST_PYTHON=/tmp/customer-issuer-venv/bin/python" >> "$GITHUB_ENV"
+
       - name: Run Maven verification
         run: mvn -B clean verify
 
