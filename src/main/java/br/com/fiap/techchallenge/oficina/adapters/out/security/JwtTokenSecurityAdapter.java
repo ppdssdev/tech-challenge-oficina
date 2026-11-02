@@ -9,6 +9,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.List;
+import io.jsonwebtoken.JwtException;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -57,7 +59,21 @@ public class JwtTokenSecurityAdapter implements TokenIssuerPort {
     @Override public long expirationMinutes() { return expirationMinutes; }
 
     private Claims extractAllClaims(String token) {
-        return Jwts.parser().verifyWith(signingKey()).build().parseSignedClaims(token).getPayload();
+        var parsed = Jwts.parser().keyLocator(header -> {
+            if (!(header instanceof io.jsonwebtoken.JwsHeader jws)
+                || !List.of("HS256", "HS384", "HS512").contains(jws.getAlgorithm())) {
+                throw new JwtException("Unsupported administrative JWT algorithm.");
+            }
+            return signingKey();
+        }).build().parseSignedClaims(token);
+        var claims = parsed.getPayload();
+        if (parsed.getHeader().getKeyId() != null || parsed.getHeader().containsKey("zip")
+            || claims.containsKey("role") || claims.containsKey("authorities")
+            || !List.of("ROLE_ADMIN").equals(claims.get("roles"))
+            || claims.getExpiration() == null) {
+            throw new JwtException("Invalid administrative JWT identity.");
+        }
+        return claims;
     }
 
     private SecretKey signingKey() {

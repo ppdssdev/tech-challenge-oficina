@@ -1,6 +1,9 @@
 package br.com.fiap.techchallenge.oficina.configuration;
 
 import br.com.fiap.techchallenge.oficina.adapters.out.security.JwtAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -16,6 +19,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
+@EnableConfigurationProperties(CustomerJwtProperties.class)
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -34,10 +38,12 @@ public class SecurityConfig {
                 .accessDeniedHandler((request, response, accessDeniedException) -> response.setStatus(403))
             )
             .authorizeHttpRequests(auth -> auth
+                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                 .requestMatchers(
-                    "/api/v1/auth/**",
-                    "/api/v1/public/**",
                     "/actuator/health",
+                    "/actuator/health/liveness",
+                    "/actuator/health/readiness",
                     "/actuator/info",
                     "/actuator/prometheus",
                     "/swagger-ui.html",
@@ -45,7 +51,14 @@ public class SecurityConfig {
                     "/v3/api-docs/**"
                 ).permitAll()
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                .anyRequest().authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/v1/public/work-orders/*/status")
+                    .hasAnyRole("ADMIN", "CUSTOMER")
+                .requestMatchers(HttpMethod.POST,
+                    "/api/v1/public/work-orders/*/status",
+                    "/api/v1/public/work-orders/*/budget/approve",
+                    "/api/v1/public/work-orders/*/budget/reject")
+                    .hasAnyRole("ADMIN", "CUSTOMER")
+                .anyRequest().denyAll()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .build();

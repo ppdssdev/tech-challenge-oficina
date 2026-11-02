@@ -5,8 +5,8 @@ spring:
   application:
     name: oficina-api
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/oficina_db}
-    username: ${SPRING_DATASOURCE_USERNAME:oficina}
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
   jpa:
     hibernate:
@@ -73,6 +73,12 @@ app:
     email:
       from: ${APP_NOTIFICATION_EMAIL_FROM:oficina@local.test}
   jwt:
+    customer:
+      enabled: ${APP_JWT_CUSTOMER_ENABLED:false}
+      issuer: ${APP_JWT_CUSTOMER_ISSUER:}
+      audience: ${APP_JWT_CUSTOMER_AUDIENCE:}
+      # External configuration supplies public-keys: { kid: /local/path/public.pem }
+      public-keys: {}
     secret: ${APP_JWT_SECRET}
     expiration-minutes: ${APP_JWT_EXPIRATION_MINUTES:120}
   admin:

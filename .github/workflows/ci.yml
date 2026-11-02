@@ -101,10 +101,17 @@ jobs:
 
       - name: Render Kubernetes manifests
         run: |
-          kubectl kustomize k8s/local > /tmp/oficina-k8s.yaml
-          test -s /tmp/oficina-k8s.yaml
+          for overlay in local staging; do
+            kubectl kustomize "k8s/$overlay" > "/tmp/oficina-k8s-$overlay.yaml"
+            test -s "/tmp/oficina-k8s-$overlay.yaml"
+          done
 
       - name: Validate Kubernetes schemas offline from cluster
         run: |
+          for overlay in local staging; do
+            docker run --rm -i ghcr.io/yannh/kubeconform@sha256:0925177fb05b44ce18574076141b5c3d83235e1904d3f952182ac99ddc45762c \
+              -strict -summary -kubernetes-version 1.34.0 < "/tmp/oficina-k8s-$overlay.yaml"
+          done
+          # The migration Job is intentionally deployed separately from the staging overlay.
           docker run --rm -i ghcr.io/yannh/kubeconform@sha256:0925177fb05b44ce18574076141b5c3d83235e1904d3f952182ac99ddc45762c \
-            -strict -summary -kubernetes-version 1.34.0 < /tmp/oficina-k8s.yaml
+            -strict -summary -kubernetes-version 1.34.0 < k8s/staging/migration-job.yaml

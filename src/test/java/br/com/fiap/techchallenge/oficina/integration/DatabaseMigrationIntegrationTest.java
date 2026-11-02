@@ -32,8 +32,10 @@ class DatabaseMigrationIntegrationTest extends PostgresIntegrationTestSupport {
             jdbcTemplate.update("insert into " + schema + ".customers (id, full_name, document_type, document_number, created_at, updated_at) values (?, 'Legacy', 'CPF', '52998224725', now(), now())", customer);
             jdbcTemplate.update("insert into " + schema + ".vehicles (id, customer_id, plate, brand, model, manufacturing_year, created_at, updated_at) values (?, ?, 'ABC1D23', 'Fiat', 'Uno', 2020, now(), now())", vehicle, customer);
             jdbcTemplate.update("insert into " + schema + ".work_orders (id, code, customer_id, vehicle_id, status, total_services, total_parts, total_amount, created_at, updated_at) values (?, 'OS-LEGACY', ?, ?, 'IN_DIAGNOSIS', 0, 0, 0, now(), now())", order, customer, vehicle);
+            // V10/V11 own global auth objects over public.customers; their upgrades are
+            // covered in isolated databases by the identity contract integration tests.
             org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema)
-                .defaultSchema(schema).load().migrate();
+                .defaultSchema(schema).target("9").load().migrate();
             assertThat(jdbcTemplate.queryForObject("select active from " + schema + ".customers where id = ?", Boolean.class, customer)).isTrue();
             assertThat(jdbcTemplate.queryForObject("select count(*) from " + schema + ".work_order_status_history", Integer.class)).isZero();
             assertThat(jdbcTemplate.queryForObject("select status from " + schema + ".work_orders where id = ?", String.class, order)).isEqualTo("IN_DIAGNOSIS");
@@ -62,7 +64,7 @@ class DatabaseMigrationIntegrationTest extends PostgresIntegrationTestSupport {
              where conname = 'chk_notification_outbox_status'
             """, String.class);
 
-        assertThat(successfulMigrations).isEqualTo(10);
+        assertThat(successfulMigrations).isEqualTo(11);
         assertThat(tableName).isEqualTo("notification_outbox");
         assertThat(idempotencyTableName).isEqualTo("idempotency_records");
         assertThat(statusConstraint)

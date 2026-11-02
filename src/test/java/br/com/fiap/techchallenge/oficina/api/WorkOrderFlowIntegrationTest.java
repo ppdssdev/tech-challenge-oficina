@@ -46,7 +46,7 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
     org.springframework.security.crypto.password.PasswordEncoder passwords;
 
     @Test
-    void shouldReturnForbiddenForRealCustomerJwt() {
+    void shouldRejectHmacCustomerIdentity() {
         String username = "customer-" + UUID.randomUUID();
         users.save(new br.com.fiap.techchallenge.oficina.domain.model.user.AppUser(
             username, passwords.encode("Customer-Test-42!"), "CUSTOMER"));
@@ -58,7 +58,7 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
             assertThat(auth.getStatusCode()).isEqualTo(HttpStatus.OK);
             var response = restTemplate.exchange(url("/api/v1/admin/work-orders"), HttpMethod.GET,
                 new HttpEntity<Void>(null, adminHeaders(requiredValue(auth, "accessToken").toString())), String.class);
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         } finally {
             jdbcTemplate.update("delete from app_users where username = ?", username);
         }
@@ -166,7 +166,7 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
-    void shouldNotifyAndApproveBudgetThroughPublicEndpointWithoutJwt() {
+    void shouldNotifyAndApproveBudgetThroughPublicEndpointWithAdminJwt() {
         String token = login();
         HttpHeaders adminHeaders = adminHeaders(token);
         UUID serviceId = createService(adminHeaders);
@@ -315,7 +315,7 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
-    void shouldRejectBudgetThroughPublicEndpointWithoutJwt() {
+    void shouldRejectBudgetThroughPublicEndpointWithAdminJwt() {
         String token = login();
         HttpHeaders adminHeaders = adminHeaders(token);
         UUID serviceId = createService(adminHeaders);
@@ -361,8 +361,9 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Test
     void shouldDisableLegacyStatusQueryEndpointOutsideLocalProfile() {
-        ResponseEntity<String> response = restTemplate.getForEntity(
-            url("/api/v1/public/work-orders/OS-INEXISTENTE/status?document=52998224725"), String.class
+        ResponseEntity<String> response = restTemplate.exchange(
+            url("/api/v1/public/work-orders/OS-INEXISTENTE/status?document=52998224725"),
+            HttpMethod.GET, new HttpEntity<>(adminHeaders(login())), String.class
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
@@ -459,8 +460,7 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
         String path,
         Map<String, Object> payload
     ) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpHeaders headers = adminHeaders(login());
         return restTemplate.exchange(
             url(path), HttpMethod.POST, new HttpEntity<>(payload, headers), JSON_OBJECT
         );
@@ -471,8 +471,7 @@ class WorkOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
         Map<String, Object> payload,
         String idempotencyKey
     ) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpHeaders headers = adminHeaders(login());
         headers.set("Idempotency-Key", idempotencyKey);
         return restTemplate.exchange(
             url(path), HttpMethod.POST, new HttpEntity<>(payload, headers), JSON_OBJECT
