@@ -12,7 +12,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Deprecated(forRemoval = true)
-@Profile("local & !prod & !production")
+@Profile("local & !prod & !production & !staging & !cloud")
+@org.springframework.security.access.prepost.PreAuthorize("@workOrderAuthorization.canAccess(authentication, #p0)")
 @RestController
 @RequestMapping("/api/v1/public/work-orders")
 public class LegacyPublicWorkOrderController {

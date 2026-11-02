@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oficina-api
+spec:
+  # First startup seeds the administrative account; scale after it is ready.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oficina-api
+  template:
+    metadata:
+      labels:
+        app: oficina-api
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: api
+          image: oficina-api:staging-review-required
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: staging
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: file:/config/jwt/customer-jwt.yml
+            - name: CUSTOMER_JWKS_URI
+              valueFrom:
+                configMapKeyRef: {name: oficina-customer-jwt, key: jwks-uri}
+            - name: CUSTOMER_JWT_ISSUER
+              valueFrom:
+                configMapKeyRef: {name: oficina-customer-jwt, key: issuer}
+            - name: CUSTOMER_JWT_AUDIENCE
+              valueFrom:
+                configMapKeyRef: {name: oficina-customer-jwt, key: audience}
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef: {name: oficina-staging-db, key: jdbc-url}
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef: {name: oficina-runtime, key: username}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: oficina-runtime, key: password}
+            - name: APP_JWT_SECRET
+              valueFrom:
+                secretKeyRef: {name: oficina-application, key: hmac-secret}
+            - name: APP_ADMIN_DEFAULT_USERNAME
+              valueFrom:
+                secretKeyRef: {name: oficina-application, key: admin-username}
+            - name: APP_ADMIN_DEFAULT_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: oficina-application, key: admin-password}
+          volumeMounts:
+            - {name: ca, mountPath: /config/ca, readOnly: true}
+            - {name: jwt, mountPath: /config/jwt, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests: {cpu: 100m, memory: 384Mi}
+            limits: {cpu: '1', memory: 1Gi}
+      volumes:
+        - name: ca
+          configMap: {name: oficina-rds-ca}
+        - name: jwt
+          configMap: {name: oficina-customer-jwt}
+        - name: tmp
+          emptyDir: {sizeLimit: 128Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oficina-api
+spec:
+  type: ClusterIP
+  selector: {app: oficina-api}
+  ports:
+    - {name: http, port: 8080, targetPort: http}

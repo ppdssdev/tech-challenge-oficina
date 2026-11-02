@@ -1,6 +1,8 @@
 # Explicitly opt in with SPRING_PROFILES_ACTIVE=local. Never enable this profile in production.
 spring:
   datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/oficina_db}
+    username: ${SPRING_DATASOURCE_USERNAME:oficina}
     password: ${SPRING_DATASOURCE_PASSWORD:oficina}
 app:
   jwt:

@@ -1,6 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  SPRING_PROFILES_ACTIVE: local
   name: oficina-api-config
   namespace: oficina
 data:

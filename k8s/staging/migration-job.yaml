@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: oficina-migrate-release
+  namespace: oficina-staging
+spec:
+  completions: 1
+  parallelism: 1
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: flyway
+          image: oficina-api:staging-review-required
+          command:
+            - java
+            - -Dloader.main=br.com.fiap.techchallenge.oficina.configuration.MigrationRunner
+            - -cp
+            - /app/app.jar
+            - org.springframework.boot.loader.launch.PropertiesLauncher
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: MIGRATION_JDBC_URL
+              valueFrom:
+                configMapKeyRef: {name: oficina-staging-db, key: jdbc-url}
+            - name: MIGRATION_USERNAME
+              valueFrom:
+                secretKeyRef: {name: oficina-migration, key: username}
+            - name: MIGRATION_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: oficina-migration, key: password}
+          volumeMounts:
+            - {name: ca, mountPath: /config/ca, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: '1', memory: 512Mi}
+      volumes:
+        - name: ca
+          configMap: {name: oficina-rds-ca}
+        - name: tmp
+          emptyDir: {sizeLimit: 128Mi}
