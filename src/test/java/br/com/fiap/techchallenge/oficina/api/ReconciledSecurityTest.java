@@ -46,6 +46,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     JwtTokenSecurityAdapter.class, CustomerJwtVerifier.class, WorkOrderAuthorization.class,
     ReconciledSecurityTest.Transactions.class})
 class ReconciledSecurityTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    io.micrometer.tracing.Tracer tracer;
     @Autowired MockMvc mvc;
     @Autowired JwtTokenSecurityAdapter hmac;
     @MockitoBean UserDetailsService users;
