@@ -1,0 +1,58 @@
+{
+  "observed_at": "2026-11-03T17:02:14.100091+00:00",
+  "region": "us-east-2",
+  "profile": "oficina-staging",
+  "scope": "read-only; no database queries or Lambda invocation",
+  "identity": {
+    "Account": "797781632267"
+  },
+  "lambda_concurrency": {
+    "ReservedConcurrentExecutions": 0
+  },
+  "lambda_release": {
+    "Runtime": "python3.13",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "CodeSha256": "6U9dtUjtBtrqWf9Xpf9VgtrZcD+solXr0xDzHwfaZ4E=",
+    "Version": "$LATEST",
+    "SigningProfileVersionArn": "arn:aws:signer:us-east-2:797781632267:/signing-profiles/oficinaStagingAuth/DTMyYrpvTA",
+    "SigningJobArn": "arn:aws:signer:us-east-2:797781632267:/signing-jobs/658d7734-8265-413f-9ae3-66a305defb5f"
+  },
+  "gateway": {
+    "ApiId": "t6p562hkc9",
+    "ProtocolType": "HTTP",
+    "DisableExecuteApiEndpoint": true
+  },
+  "routes": [
+    {
+      "RouteKey": "POST /auth/token",
+      "AuthorizationType": "AWS_IAM",
+      "Target": "integrations/els93oc"
+    }
+  ],
+  "node": [
+    {
+      "InstanceId": "i-0ab373b1ba5c14b3e",
+      "PingStatus": "Online",
+      "AgentVersion": "3.3.4793.0"
+    }
+  ],
+  "rds": [
+    {
+      "Identifier": "oficina-staging-postgres",
+      "Status": "available",
+      "Engine": "postgres",
+      "Version": "16.15",
+      "Public": false,
+      "Encrypted": true,
+      "Port": 5432,
+      "CA": "rds-ca-rsa2048-g1"
+    }
+  ],
+  "cluster_read": {
+    "Status": "Success",
+    "ExecutedAt": "2026-11-03T17:00:13.993Z",
+    "Output": "3/3\n797781632267.dkr.ecr.us-east-2.amazonaws.com/oficina-staging-api@sha256:40b333a1546a157438789945b6bc47d7eea5c59e8958ba9dd31176beb8686527\nNAME                           READY   IMAGE                                                                                                                                      IMAGE_ID\noficina-api-769d4959df-9shcl   true    797781632267.dkr.ecr.us-east-2.amazonaws.com/oficina-staging-api@sha256:40b333a1546a157438789945b6bc47d7eea5c59e8958ba9dd31176beb8686527   797781632267.dkr.ecr.us-east-2.amazonaws.com/oficina-staging-api@sha256:40b333a1546a157438789945b6bc47d7eea5c59e8958ba9dd31176beb8686527\noficina-api-769d4959df-cjt92   true    797781632267.dkr.ecr.us-east-2.amazonaws.com/oficina-staging-api@sha256:40b333a1546a157438789945b6bc47d7eea5c59e8958ba9dd31176beb8686527   797781632267.dkr.ecr.us-east-2.amazonaws.com/oficina-staging-api@sha256:40b333a1546a157438789945b6bc47d7eea5c59e8958ba9dd31176beb8686527\noficina-api-769d4959df-jffrp   true    797781632267.dkr.ecr.us-east-2.amazonaws.com/oficina-staging-api@sha256:40b333a1546a157438789945b6bc47d7eea5c59e8958ba9dd31176beb8686527   797781632267.dkr.ecr.us-east-2.amazonaws.com/oficina-staging-api@sha256:40b333a1546a157438789945b6bc47d7eea5c59e8958ba9dd31176beb8686527\nNAME          TYPE        PORT   TARGET\noficina-api   ClusterIP   8080   http\n",
+    "Error": ""
+  }
+}

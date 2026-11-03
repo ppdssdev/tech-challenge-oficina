@@ -1,105 +1,66 @@
-# CI independente e CD futuro
+# CI atual, release manual e CD pendente
 
-## Implementado nesta PR
+Estado em 2026-11-03; fontes imutáveis: [baseline](README.md).
+As quatro mains executam CI em push/PR, com `contents: read`, actions fixadas por SHA
+e sem credenciais AWS ou `id-token: write`. CI verde comprova execução dos checks,
+não aplicação de Terraform nem deployment cloud.
 
-Cada repo executa CI próprio em pull_request e push main, com contents:read,
-actions fixadas em SHA, timeout e concorrência cancelando CI obsoleto. Sem OIDC,
-credenciais AWS, deploy, dispatch entre repos ou acesso à conta. Dependabot atualiza
-Actions por PR. Evitar pull_request_target e execução de código não confiável com secrets.
+| Repo | Validação em main | Execução consultada (success) |
+|---|---|---|
+| API | Maven/JaCoCo, Docker build, Terraform local, renderer e kubeconform; smoke Kind em workflow manual separado | [41636042180](https://github.com/ppdssdev/tech-challenge-oficina/actions/runs/41636042180) |
+| Lambda | Comando integral: Python 3.13, PostgreSQL/TLS e grants, Ruff, 11 testes Terraform mock, builds determinísticos e smoke ZIP | [41625965174](https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda/actions/runs/41625965174) |
+| K3s | preflight Terraform/políticas/testes, ShellCheck/Checkov e TFLint | [41625905236](https://github.com/ppdssdev/tech-challenge-oficina-infra-k3s/actions/runs/41625905236) |
+| RDS | fmt/init sem backend/validate, política AST e Checkov | [41625940842](https://github.com/ppdssdev/tech-challenge-oficina-infra-rds/actions/runs/41625940842) |
 
-Aplicação: Maven clean verify Java 21 (JUnit, Testcontainers PostgreSQL e Flyway),
-JaCoCo mínimo 80% de linhas nos pacotes de domínio, Docker build sem push,
-Terraform local fmt/init backend=false/validate, render Kustomize + kubeconform strict.
-Os testes de integração terminam em Test e são executados pelo Surefire; Docker é
-obrigatório, não há opção silenciosa de ignorá-los. Smoke Kind existente é manual e
-somente local ao runner, sem AWS. Artifact JaCoCo permite inspeção da cobertura.
+Fontes: [workflow API](../../.github/workflows/ci.yml),
+[.github/workflows/ci.yml](https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda/blob/1ff247717e35054967495ba7684742c67aaeb9da/.github/workflows/ci.yml), [.github/workflows/ci.yml](https://github.com/ppdssdev/tech-challenge-oficina-infra-k3s/blob/10fa81e88e8e5cd9ab06fe8661cf1a735be26675/.github/workflows/ci.yml),
+[.github/workflows/ci.yml](https://github.com/ppdssdev/tech-challenge-oficina-infra-rds/blob/51bb0557156a42e0f6f71c05bc304a6e9af362bf/.github/workflows/ci.yml). A Lambda fixa o contrato Java em
+`57eb5df2c3e32fe5663596cbecfcd43a5d3ed780`; não deve consumir main móvel para testes
+SQL. A consulta aos runs confirma conclusão success; não se atribuem números de
+testes de relatórios antigos ao HEAD atual.
 
-Auth: lint Ruff, testes positivos/negativos JSON Schema, build determinístico do
-contrato e checksum; artifact por SHA com retenção 7 dias. Não existe handler ainda.
-Infra: fmt/init backend=false/validate, política estática de ausência de recursos,
-Checkov sem soft-fail. O scanner não demonstra segurança de recursos ainda inexistentes.
-Sem provider AWS nesta fase: nenhum lockfile de provider necessário; adicionar e
-revisar `.terraform.lock.hcl` junto com o provider na implementação.
+## OIDC e SCP
 
-```mermaid
-flowchart TD
-  PR[PR independente por repositório] --> CI[Build / testes / segurança]
-  CI --> Review[Revisão e checks obrigatórios]
-  Review --> Merge[Merge manual autorizado]
-  Merge --> End[Estado atual: CI somente]
-  Merge -. futuro .-> Artifact[Artifact imutável por SHA / digest]
-  Artifact -.-> Stage[OIDC staging: plan revisado / deploy / smoke]
-  Stage -.-> Approval[Environment production: aprovação independente]
-  Approval -.-> Prod[Promover mesmo digest / plano do ambiente]
-  Prod -. falha .-> Rollback[Voltar digest e configuração anterior]
-```
+As PRs [API #10](https://github.com/ppdssdev/tech-challenge-oficina/pull/10),
+[Auth #5](https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda/pull/5),
+[K3s #5](https://github.com/ppdssdev/tech-challenge-oficina-infra-k3s/pull/5) e
+[RDS #7](https://github.com/ppdssdev/tech-challenge-oficina-infra-rds/pull/7) estavam
+abertas na auditoria. Preparam apenas validação manual STS, com trust por repo/main
+e audience `sts.amazonaws.com`; não implementam CD completo. Roles propostas sem
+identity policies não autorizam deploy/state/secrets. Na auditoria atual,
+`iam:ListOpenIDConnectProviders` foi negado explicitamente por SCP. Resolver com
+administração da organização; não contornar com credenciais permanentes nem reduzir
+governança. A existência/configuração do provider e a federação real permanecem
+não comprovadas. Além da SCP, a trust proposta usa subject por nomes, mas os três
+repos novos usam prefixos imutáveis com IDs: precisam correção coordenada antes de
+federação. [Consulta de governança/subjects](governance-audit.md). Dizer “CD bloqueado pela SCP” inclui esse impedimento, mas também
+há trabalho de CD ainda não implementado; liberar a SCP não entrega CD sozinho.
 
-## Desenho futuro — requer nova PR e autorização
+## Release e rollback por digest
 
-Separar CI não privilegiado de publish/deploy. Build uma vez após merge e publicar
-imagem em registry com tag sha-<commit>, SBOM/proveniência e digest sha256; promover
-exatamente o digest testado em staging para production, sem rebuild nem latest.
-Auth futura usa ZIP por SHA/checksum + versão imutável Lambda, alias por ambiente.
+O [renderer](../../scripts/staging/render.sh) exige referência por digest. O
+[runbook existente](../staging/release-local.md) e o script de release manual
+tratam preflight, build/publicação e execução controlada via SSM; não são GitHub CD.
+Fluxo: revisão limpa/CI → artefato identificado → ECR imutável → digest revisado →
+Job Flyway separado se necessário → renderização → rollout → readiness → testes
+ADMIN/CUSTOMER e ownership. A sequência descreve o procedimento; a auditoria atual
+não executou release e não comprovou proveniência do digest em execução.
 
-OIDC: somente jobs de deploy terão id-token:write. Trust IAM com aud=sts.amazonaws.com
-e sub exato `repo:ppdssdev/<repo>:environment:<ambiente>`. Role distinta por repo e
-ambiente; sem wildcards de repo/ambiente, sem access keys. Restringir recursos e ações:
-infra por stack/tag/região (documentar exceções de APIs sem escopo de recurso), auth
-somente função/API autorizadas, app somente promoção e comando SSM específico.
-Policy iam:PassRole limitada a roles/serviços exatos; role EC2 separada da role pipeline.
+Runtime não carrega Flyway habilitado. O Job de migration não pertence ao
+kustomization runtime e seu placeholder não é imagem válida de release. Manter
+credencial migrator separada. `--dry-run` do release serve para revisão local;
+`--execute` efetua mudanças e não foi chamado nesta tarefa.
 
-Infra futura: plan protegido no mesmo commit, revisão de custo/diff, artifact privado
-com retenção curta por conter valores sensíveis, apply do plano revisado após gate.
-Sem plano de PR externo com credenciais. Production exige aprovação do environment,
-sem self-review/bypass, branches protegidas, serialização por stack/ambiente e lock
-Terraform (não cancelar apply em execução). Alteração de commit invalida plano/aprovação.
+Rollback recupera **digest anterior verificado**, confere compatibilidade com o
+schema já aplicado e restaura runtime/configuração conforme runbook. Não reverter
+migrations automaticamente, não publicar tag mutável para “voltar”, não interpretar
+reversão de Git como rollback cloud. Produção requer ambiente/controles próprios;
+não há produção implantada comprovada.
 
-App: deploy via SSM documento fixo/allowlist para EC2 (evitar runner permanente no nó),
-puxa digest e faz rollout com probes, smoke e prazo. Não expor 6443 para runners.
-RDS: verificar backups e janela de manutenção antes de mudanças destrutivas.
+## Terraform independente
 
-Rollback app: redeploy digest/config anterior; migrações expand/contract compatíveis
-com pelo menos versão anterior, sem rollback automático destrutivo Flyway. Banco:
-PITR/snapshot restaurado em nova instância, validar e trocar endpoint após aprovação;
-RPO/RTO devem ser medidos em ensaio. Lambda: voltar alias à versão testada. Terraform:
-reverter código, gerar novo plano e revisar; nunca restaurar state antigo cegamente.
-Se produção falhar após migração incompatível, interromper promoção e usar runbook.
-
-## Rastreabilidade: SHA testado não é necessariamente HEAD da PR
-
-Os quatro workflows usam `pull_request` e checkout padrão. Nesse evento,
-`GITHUB_REF=refs/pull/<n>/merge` e `GITHUB_SHA`/`github.sha` identificam o commit
-sintético de merge preparado pelo GitHub para testar HEAD + base. O HEAD da PR é
-`github.event.pull_request.head.sha`; a base é `github.event.pull_request.base.sha`.
-O SHA sintético pode mudar quando a base muda, mesmo sem alteração no HEAD da PR.
-Não é prova de merge na main e não deve ser descrito como commit de release.
-Em `push` para main, `GITHUB_SHA` identifica o commit desse push. O metadata
-`head_sha` da API de workflow runs não substitui a identificação do checkout testado.
-[Semântica oficial](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request).
-
-| Resultado atual | Identidade correta e limite |
-|---|---|
-| Auth: `auth-contracts-<GITHUB_SHA>.zip`, checksum e artifact `auth-contracts-<github.sha>` | Em PR, SHA do merge sintético testado; não HEAD da PR. Bundle de contratos, não função Lambda |
-| App: `jacoco-report` | Nome não contém SHA; associar ao repositório, run ID, run attempt e job/commit testado |
-| App: imagem `tech-challenge-oficina:ci` | Tag temporária local ao runner; sem push/registro/promovibilidade comprovada |
-| K3s/RDS | Logs de fmt/validate/Checkov; nenhum artifact de plano ou infraestrutura implantada |
-
-Exemplo real anterior à correção: auth PR #1 HEAD
-`1d3a66524c5486c66c168487c04511286263141a`, [run 41235925327](https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda/actions/runs/41235925327),
-artifact `auth-contracts-2f469cf783afa3764900717e8b6f8fdfba4b4770` (ID 13055345995).
-O segundo SHA identifica o merge de CI, não uma alteração oculta na branch auth.
-Os metadados do run registram o primeiro SHA; o nome do bundle registra o segundo.
-
-Para evidência, guardar juntos: repo, evento, PR, HEAD, base, SHA efetivamente
-checado (`git rev-parse HEAD`/GITHUB_SHA), run ID/attempt/URL, artifact ID/nome e
-checksum do arquivo (ou digest da imagem). No bootstrap esses dados se consultam
-no evento/run, Git e artifact; ainda não há manifesto agregado de proveniência.
-Não promover artifacts de PR. No futuro publicar artefato de release após merge em
-main, registrar essa tupla em manifesto, assinar/atestar proveniência e promover o
-mesmo digest de staging para production. Checksum sozinho não atesta origem.
-
-**CI implementado; CD automático não implementado.** Push main repete validações.
-Environments protegidos são configuração de governança, não execução de deploy.
-O workflow manual Kind cria ambiente descartável local ao runner e não comprova
-staging/production AWS. O desenho de CD acima continua pendente de implementação,
-aprovação, autorização AWS e evidência de execução.
+Cada stack usa backend S3 e chave própria `staging/k3s`, `staging/rds` ou
+`staging/lambda`, com `use_lockfile=true` e `encrypt=true` no código. A existência,
+versionamento, políticas e migração efetiva do backend não foram auditados lendo
+state. Contratos de outputs explícitos evitam compartilhar credenciais e ownership;
+ordem: K3s/rede → RDS → auth/API. Sem mudança de state nesta consolidação.
