@@ -1,0 +1,221 @@
+{
+  "observed_at": "2026-11-03T16:58:49.037269+00:00",
+  "repositories": [
+    {
+      "repo": "tech-challenge-oficina",
+      "permission": {
+        "permission": "write",
+        "role_name": "write",
+        "permissions": {
+          "admin": false,
+          "maintain": false,
+          "push": true,
+          "triage": true,
+          "pull": true
+        },
+        "error": null
+      },
+      "invitations": [],
+      "pulls": [
+        {
+          "number": 13,
+          "state": "open",
+          "merged": false,
+          "base": "main",
+          "head": "feat/staging-observability",
+          "sha": "fadc2b9eabac5148e449a4554ea1a1e09e699377",
+          "url": "https://github.com/ppdssdev/tech-challenge-oficina/pull/13",
+          "checks": [
+            {
+              "name": "Docker build",
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/ppdssdev/tech-challenge-oficina/actions/runs/41642527647/job/125940201534"
+            },
+            {
+              "name": "Infrastructure validation",
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/ppdssdev/tech-challenge-oficina/actions/runs/41642527647/job/125939382292"
+            },
+            {
+              "name": "validate",
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/ppdssdev/tech-challenge-oficina/actions/runs/41642528045/job/125939382100"
+            },
+            {
+              "name": "Maven verification",
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/ppdssdev/tech-challenge-oficina/actions/runs/41642527647/job/125939381694"
+            }
+          ],
+          "combined_status": "pending",
+          "status_count": 0
+        },
+        {
+          "number": 14,
+          "state": "open",
+          "merged": false,
+          "base": "main",
+          "head": "docs/fase3-final-audit",
+          "sha": "ac5834624873219fc441c6cc54056dfb14baee71",
+          "url": "https://github.com/ppdssdev/tech-challenge-oficina/pull/14",
+          "checks": [
+            {
+              "name": "Docker build",
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/ppdssdev/tech-challenge-oficina/actions/runs/41644735611/job/125947648630"
+            },
+            {
+              "name": "Maven verification",
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/ppdssdev/tech-challenge-oficina/actions/runs/41644735611/job/125947003925"
+            },
+            {
+              "name": "Infrastructure validation",
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/ppdssdev/tech-challenge-oficina/actions/runs/41644735611/job/125947003627"
+            }
+          ],
+          "combined_status": "pending",
+          "status_count": 0
+        }
+      ]
+    },
+    {
+      "repo": "tech-challenge-oficina-auth-lambda",
+      "permission": {
+        "permission": "read",
+        "role_name": "read",
+        "permissions": {
+          "admin": false,
+          "maintain": false,
+          "push": false,
+          "triage": false,
+          "pull": true
+        },
+        "error": null
+      },
+      "invitations": [],
+      "pulls": [
+        {
+          "number": 6,
+          "state": "open",
+          "merged": false,
+          "base": "main",
+          "head": "test/fase3-cpf-demo",
+          "sha": "6736f7f2ed3d205c9351b2743a17f6cc34705290",
+          "url": "https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda/pull/6",
+          "checks": [
+            {
+              "name": "Auth contract and build",
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda/actions/runs/41642968661/job/125940870009"
+            }
+          ],
+          "combined_status": "pending",
+          "status_count": 0
+        },
+        {
+          "number": 7,
+          "state": "open",
+          "merged": false,
+          "base": "main",
+          "head": "docs/fase3-final-audit",
+          "sha": "5ee81f4250b4604018b143e34c9de987fd5535a7",
+          "url": "https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda/pull/7",
+          "checks": [
+            {
+              "name": "Auth contract and build",
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda/actions/runs/41644756074/job/125947075285"
+            }
+          ],
+          "combined_status": "pending",
+          "status_count": 0
+        }
+      ]
+    },
+    {
+      "repo": "tech-challenge-oficina-infra-k3s",
+      "permission": {
+        "permission": "read",
+        "role_name": "read",
+        "permissions": {
+          "admin": false,
+          "maintain": false,
+          "push": false,
+          "triage": false,
+          "pull": true
+        },
+        "error": null
+      },
+      "invitations": [],
+      "pulls": [
+        {
+          "number": 6,
+          "state": "open",
+          "merged": false,
+          "base": "main",
+          "head": "docs/fase3-final-audit",
+          "sha": "e1994e2275f4b1c708d3655be7bf0fe2a7728f88",
+          "url": "https://github.com/ppdssdev/tech-challenge-oficina-infra-k3s/pull/6",
+          "checks": [
+            {
+              "name": "Terraform validation and security",
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/ppdssdev/tech-challenge-oficina-infra-k3s/actions/runs/41644767297/job/125947116834"
+            }
+          ],
+          "combined_status": "pending",
+          "status_count": 0
+        }
+      ]
+    },
+    {
+      "repo": "tech-challenge-oficina-infra-rds",
+      "permission": {
+        "permission": "read",
+        "role_name": "read",
+        "permissions": {
+          "admin": false,
+          "maintain": false,
+          "push": false,
+          "triage": false,
+          "pull": true
+        },
+        "error": null
+      },
+      "invitations": [],
+      "pulls": [
+        {
+          "number": 8,
+          "state": "open",
+          "merged": false,
+          "base": "main",
+          "head": "docs/fase3-final-audit",
+          "sha": "ab627ed206a08dcaf5d418d17a10fa44ac079447",
+          "url": "https://github.com/ppdssdev/tech-challenge-oficina-infra-rds/pull/8",
+          "checks": [
+            {
+              "name": "Terraform validation and security",
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/ppdssdev/tech-challenge-oficina-infra-rds/actions/runs/41644781675/job/125947165713"
+            }
+          ],
+          "combined_status": "pending",
+          "status_count": 0
+        }
+      ]
+    }
+  ]
+}

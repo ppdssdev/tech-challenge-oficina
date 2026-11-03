@@ -179,3 +179,17 @@ passaram. Kubectl foi usado somente para Kustomize local; AWS e Docker são mock
 nos testes. Nenhuma suíte Java foi reexecutada: seus fontes foram auditados para
 identificar o bloqueio de contrato, sem alterar código/testes ou inferir o
 resultado do staging. Esta documentação adicional não muda esses resultados.
+
+## Snapshot consultado e correção preparada
+
+[Snapshot GitHub/AWS e acesso efetivo](https://github.com/ppdssdev/tech-challenge-oficina/blob/docs/fase3-final-audit/docs/fase3/security-review-evidence.md):
+checks das bases consultadas aprovados; API write e outros três read para
+`soat-architecture`, sem convites pendentes. Lambda zero, Gateway desabilitado
+AWS_IAM, API 3/3 privada; nenhuma consulta SQL no RDS. Não confundir esses
+checks anteriores com validação dos novos heads documentais.
+
+[Lambda #8](https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda/pull/8)
+contém a correção do adapter e prazo de cleanup, empilhada sobre #6. Sua base não
+aciona o workflow atual; exigir CI no SHA final antes da integração em main.
+O [runbook corretivo](https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda/blob/fix/private-cpf-review/docs/fase3/private-transport-review.md)
+traz os comandos privados e limites. A janela continua não autorizada nesta frente.
