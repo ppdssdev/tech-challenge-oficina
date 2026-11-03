@@ -438,7 +438,7 @@
           "refId": "A"
         }
       ],
-      "title": "Pods com scrape saudável (esperado: 3)",
+      "title": "Pods com scrape saudável (comparar com Deployment/HPA)",
       "type": "stat"
     }
   ],

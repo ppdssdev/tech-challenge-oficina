@@ -6,7 +6,7 @@ umask 077
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 KUBECTL=${KUBECTL:-kubectl}
 STATE_DIR=${STATE_DIR:-/var/lib/oficina-observability}
-EXPECTED_API_PODS=${EXPECTED_API_PODS:-3}
+EXPECTED_API_PODS=${EXPECTED_API_PODS:-auto}
 NS=oficina-staging
 OWNER='app.kubernetes.io/part-of=oficina-observability'
 KINDS=deployments,services,configmaps,serviceaccounts,roles,rolebindings,persistentvolumeclaims
@@ -20,7 +20,7 @@ usage() { echo "Uso: $0 install | rollback /var/lib/oficina-observability/attemp
 [[ $# -ge 1 ]] || usage
 MODE=$1
 [[ "$MODE" == install && $# == 1 || "$MODE" == rollback && $# == 2 ]] || usage
-[[ "$EXPECTED_API_PODS" =~ ^[1-9][0-9]*$ ]] || usage
+[[ "$EXPECTED_API_PODS" == auto || "$EXPECTED_API_PODS" =~ ^[1-9][0-9]*$ ]] || usage
 for tool in "$KUBECTL" python3 curl flock; do command -v "$tool" >/dev/null; done
 mkdir -p "$STATE_DIR"
 exec 9>"$STATE_DIR/lock"
@@ -44,15 +44,29 @@ check_targets() {
         sleep 1
     done
     [[ -n "$port" ]] || return 1
+    local sample='' previous=''
     for ((i=0; i<24; i++)); do
         kill -0 "$PF_PID" 2>/dev/null || return 1
-        if k get pods -l app=oficina-api -o json >"$temp_dir/pods.json" &&
+        if k get deployment oficina-api -o json >"$temp_dir/deployment.json" &&
+            k get pods -l app=oficina-api -o json >"$temp_dir/pods.json" &&
             curl --fail --silent --show-error --max-time 5 "http://127.0.0.1:$port/api/v1/targets" >"$temp_dir/targets.json" &&
-            python3 "$ROOT/scripts/staging/observability/check-targets.py" "$temp_dir/pods.json" "$temp_dir/targets.json" "$EXPECTED_API_PODS"; then
-            cleanup
-            return 0
+            k get pods -l app=oficina-api -o json >"$temp_dir/pods-after.json" &&
+            k get deployment oficina-api -o json >"$temp_dir/deployment-after.json" &&
+            sample=$(python3 "$ROOT/scripts/staging/observability/check-targets.py" \
+                "$temp_dir/pods.json" "$temp_dir/targets.json" "$EXPECTED_API_PODS" \
+                "$temp_dir/deployment.json" "$temp_dir/pods-after.json" "$temp_dir/deployment-after.json"); then
+            if [[ "$sample" == "$previous" ]]; then
+                printf '%s\n' "$sample"
+                cleanup
+                return 0
+            fi
+            previous=$sample
+            # Require the same healthy pod identities across at least one scrape interval.
+            sleep 15
+        else
+            previous=''
+            sleep 5
         fi
-        sleep 5
     done
     cleanup
     return 1
