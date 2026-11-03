@@ -41,6 +41,9 @@ Executar no root k3s; repetir no RDS para confirmar ausência de mudanças de re
 
 Após revisão/merge e provisionamento manual fora desta tarefa, disparar Validate staging OIDC em main em cada repo. Evidência: STS Account 797781632267, ARN assumed-role/oficina-staging-github-<role>/github-<run>-<attempt>, eventos CloudTrail AssumeRoleWithWebIdentity com sujeito correto. Não imprimir JWT/credenciais. Branch diferente deve pular job; tokens fork/PR/outro aud devem ser recusados pela trust. Simulação IAM não substitui teste real de federação. Verificar também negação de acesso aos três states e lockfiles com sessões destas roles, sem escrever/deletar objetos.
 
-Riscos pendentes: SCP pode impedir leitura/criação/federação; provider existente e suas audiences não confirmados; proteção de main não auditada; políticas de recurso externas podem conceder acessos e precisam revisão antes de ampliar uso. Nenhum apply, destroy, import, merge ou CD foi executado.
+Riscos pendentes: SCP pode impedir leitura/criação/federação; provider existente e suas audiences não confirmados; API GitHub confirmou protected=true em main nos quatro repos (regras detalhadas não revisadas); políticas de recurso externas podem conceder acessos e precisam revisão antes de ampliar uso. Nenhum apply, destroy, import, merge ou CD foi executado.
 
 Referências: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html ; https://registry.terraform.io/providers/hashicorp/aws/latest/docs ; https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws
+
+## Evidências locais
+Terraform init -backend=false -lockfile=readonly e validate: k3s/RDS aprovados; nenhum acesso ao backend. Testes de política: k3s 12, RDS 8 aprovados. Checkov Terraform: k3s 103 aprovados/0 falhas/6 skips preexistentes; RDS 27 aprovados/0 falhas/7 skips preexistentes. API branches/main retornou protected=true nos quatro repositórios. Autenticação OIDC real permanece pendente do provisionamento autorizado e resolução da auditoria SCP.
