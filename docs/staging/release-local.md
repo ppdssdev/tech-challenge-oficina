@@ -34,13 +34,18 @@ bash scripts/staging/release-local.sh --execute
 ```
 
 Exige checkout completamente limpo, ferramentas AWS CLI v2, Docker e tar, sessão
-temporária no perfil oficina-staging com 30 minutos restantes, conta/região certas,
+temporária no perfil oficina-staging com pelo menos 60 segundos restantes, conta/região certas,
 ECR IMMUTABLE sem exceções, tag ainda ausente e SSM Online. Exige terminal e a
 palavra PUBLICAR antes de construir ou autenticar. Constrói somente arquivos do
 commit via git archive para linux/amd64; confirmar compatibilidade do nó antes
 de promover. Bases Docker e pacotes não são fixados por digest: rebuild não é
 bit a bit reproduzível; a tag git-<SHA completo> nunca é sobrescrita. Uma tag já
 existente bloqueia repetição, inclusive após falha posterior ao push.
+
+Use `aws login --profile oficina-staging` para iniciar a sessão. As credenciais
+de 15 minutos são aceitas; cada chamada resolve novamente o perfil para permitir
+renovação automática. A sessão e conta são revalidadas após o build, antes do push.
+O digest retornado pelo ECR deve corresponder ao digest informado pelo push.
 
 Credenciais temporárias são verificadas em memória; token ECR passa por stdin e
 configuração Docker fica em diretório restrito removido ao sair. Não usar debug

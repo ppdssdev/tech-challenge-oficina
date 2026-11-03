@@ -29,6 +29,8 @@ export AWS_IGNORE_CONFIGURED_ENDPOINT_URLS=true AWS_PAGER='' AWS_CLI_AUTO_PROMPT
 aws_local() { aws --profile oficina-staging --region us-east-2 "$@"; }
 region=$(aws_local configure get region)
 [[ $region == us-east-2 ]] || fail 'Região do perfil divergente'
+# Validate snapshots only; every AWS call resolves the profile again for automatic renewal.
+validate_session() {
 # Credential JSON is consumed only in memory, never emitted or saved.
 aws_local configure export-credentials --format process | python3 -c '
 import json,sys,datetime
@@ -36,10 +38,13 @@ c=json.load(sys.stdin)
 if not c.get("SessionToken"): sys.exit("Credenciais temporárias obrigatórias")
 e=c.get("Expiration")
 if not e: sys.exit("Expiração obrigatória")
-if datetime.datetime.fromisoformat(e.replace("Z","+00:00")) <= datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(minutes=30): sys.exit("Sessão curta demais")
-' || fail 'Renove as credenciais temporárias do perfil'
-account=$(aws_local sts get-caller-identity --query Account --output text)
+if datetime.datetime.fromisoformat(e.replace("Z","+00:00")) <= datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(seconds=60): sys.exit("Credenciais expiradas ou com menos de 60 segundos restantes")
+' || fail 'Sessão indisponível: execute aws login --profile oficina-staging'
+local account
+account=$(aws_local sts get-caller-identity --query Account --output text) || fail 'Sessão AWS inativa'
 [[ $account == 797781632267 ]] || fail 'Conta AWS divergente'
+}
+validate_session
 docker info >/dev/null 2>&1 || fail 'Docker indisponível'
 repo=797781632267.dkr.ecr.us-east-2.amazonaws.com/oficina-staging-api
 uri=$(aws_local ecr describe-repositories --repository-names oficina-staging-api --query 'repositories[0].repositoryUri' --output text)
@@ -65,10 +70,15 @@ git archive "$commit" | tar -x -C "$work"
 export DOCKER_CONFIG="$work/.docker"
 mkdir "$DOCKER_CONFIG"
 docker build --platform linux/amd64 -t "$repo:git-$commit" "$work"
+# The build and confirmation may outlive the original credentials.
+validate_session
 aws_local ecr get-login-password | docker login --username AWS --password-stdin "${repo%%/*}" >/dev/null 2>&1
-docker push "$repo:git-$commit"
+docker push "$repo:git-$commit" | tee "$work/push.log"
+pushed_digest=$(sed -nE 's/.*digest: (sha256:[a-f0-9]{64}).*/\1/p' "$work/push.log")
+[[ $pushed_digest =~ ^sha256:[a-f0-9]{64}$ ]] || fail 'Digest ausente ou inválido no push'
 digest=$(aws_local ecr describe-images --repository-name oficina-staging-api --image-ids "imageTag=git-$commit" --query 'imageDetails[0].imageDigest' --output text)
 [[ $digest =~ ^sha256:[a-f0-9]{64}$ ]] || fail 'Digest inválido retornado pelo ECR'
+[[ $digest == "$pushed_digest" ]] || fail 'Digest do ECR diverge do push'
 bash scripts/staging/render.sh "$repo@$digest" > "$work/runtime.yaml"
 printf 'Imagem publicada: %s@%s\n' "$repo" "$digest"
 printf '%s\n' 'Manifest validado em memória temporária. Reproduza com render.sh e o digest acima.' 'Deploy automático BLOQUEADO: permissões e transporte SSM não comprovados.'
