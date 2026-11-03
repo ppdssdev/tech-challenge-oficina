@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oficina-observability-prometheus
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: oficina-observability-prometheus
+  template:
+    metadata:
+      labels:
+        app: oficina-observability-prometheus
+    spec:
+      automountServiceAccountToken: true
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v3.5.5@sha256:540bbdc8c081f679c6b01b203c8824c9c12bb324fc22ad5d71768c8b717a00e4
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 9090
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 768Mi
+        volumeMounts:
+        - name: data
+          mountPath: /prometheus
+        - name: tmp
+          mountPath: /tmp
+        - name: config
+          mountPath: /etc/prometheus
+          readOnly: true
+        args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        - --storage.tsdb.retention.time=24h
+        - --storage.tsdb.retention.size=1GB
+        - --storage.tsdb.wal-compression
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /-/ready
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 60
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: oficina-observability-prometheus
+      - name: tmp
+        emptyDir:
+          sizeLimit: 64Mi
+      - name: config
+        configMap:
+          name: oficina-observability-prometheus
+      serviceAccountName: oficina-observability-prometheus
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oficina-observability-prometheus
+spec:
+  type: ClusterIP
+  selector:
+    app: oficina-observability-prometheus
+  ports:
+  - name: http
+    port: 9090
+    targetPort: http
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: oficina-observability-prometheus
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
