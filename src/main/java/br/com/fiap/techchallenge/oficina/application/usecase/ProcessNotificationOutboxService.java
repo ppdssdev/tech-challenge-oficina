@@ -58,7 +58,7 @@ public final class ProcessNotificationOutboxService implements ProcessNotificati
                 } else {
                     outbox.markFailed(message.id(), errorMessage);
                 }
-                log.warn("Falha ao processar notificação da outbox. id={} erro={}", message.id(), errorMessage);
+                log.warn("Falha ao processar notificação da outbox. exception={}", exception.getClass().getSimpleName());
             }
         }
         return new ProcessNotificationOutboxResult(messages.size(), sent, failed);
