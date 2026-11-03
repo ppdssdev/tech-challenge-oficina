@@ -101,11 +101,12 @@ class PolicyTests(unittest.TestCase):
         cls.objects = list(yaml.safe_load_all(cls.rendered))
 
     def test_resource_scope_and_rbac(self):
-        allowed = {'Deployment', 'Service', 'ConfigMap', 'PersistentVolumeClaim', 'ServiceAccount', 'Role', 'RoleBinding'}
+        allowed = {'Deployment', 'Service', 'ConfigMap', 'PersistentVolumeClaim', 'ServiceAccount', 'Role', 'RoleBinding', 'NetworkPolicy'}
         for obj in self.objects:
             self.assertIn(obj['kind'], allowed)
             self.assertEqual(obj['metadata']['namespace'], 'oficina-staging')
-            self.assertTrue(obj['metadata']['name'].startswith('oficina-observability-'))
+            self.assertTrue(obj['metadata']['name'].startswith('oficina-observability-')
+                            or (obj['kind'] == 'Service' and obj['metadata']['name'] == 'oficina-tempo'))
             if obj['kind'] == 'Role':
                 self.assertEqual(obj['rules'], [{'apiGroups': [''], 'resources': ['pods'], 'verbs': ['list', 'watch']}])
             if obj['kind'] == 'Service':
@@ -132,7 +133,7 @@ class PolicyTests(unittest.TestCase):
                 if c['name'] == 'prometheus':
                     self.assertIn('--storage.tsdb.retention.time=24h', c['args'])
                     self.assertIn('--storage.tsdb.retention.size=1GB', c['args'])
-                else:
+                elif c['name'] == 'grafana':
                     env = {e['name']: e for e in c['env']}
                     self.assertIn('GF_SECURITY_ADMIN_PASSWORD__FILE', env)
                     self.assertIn('secretKeyRef', env['GF_SECURITY_ADMIN_USER']['valueFrom'])
@@ -175,6 +176,15 @@ if args[0]=='get':
   if mode=='preflight-churn' or (mode=='churn' and state):
    pods['items'][0]['metadata']['uid']=str(reads//2)
   print(json.dumps(pods))
+ elif '-f' in args:
+  if mode=='get-error': sys.exit(7)
+  if mode=='empty-json' and not state: sys.exit(0)
+  if mode=='invalid-json': print('{invalid'); sys.exit(0)
+  if mode=='whitespace-json': print('  '); sys.exit(0)
+  docs=list(yaml.safe_load_all(pathlib.Path(args[args.index('-f')+1]).read_text()))
+  items=docs[0]['items'] if docs[0]['kind']=='List' else docs
+  ids={(x['kind'],x['metadata']['name']) for x in items}
+  print(json.dumps({'apiVersion':'v1','kind':'List','items':[x for x in state if (x['kind'],x['metadata']['name']) in ids]}))
  elif '-o' in args and args[args.index('-o')+1]=='json': print(json.dumps({'apiVersion':'v1','kind':'List','items':state}))
  else: print('exists')
 elif args[0]=='apply':
@@ -227,6 +237,48 @@ class InstallerTests(unittest.TestCase):
 
     def inventory(self): return json.loads((self.path/'cluster.json').read_text())
 
+    def test_empty_successful_kubectl_output_is_no_resources(self):
+        result = self.run_install('empty-json')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        attempt = next((self.path/'state').glob('attempt.*'))
+        self.assertEqual(json.loads((attempt/'before.json').read_text())['items'], [])
+        self.assertTrue(self.inventory())
+
+    def test_bad_kubectl_output_never_reaches_mutation(self):
+        for mode in ['get-error', 'invalid-json', 'whitespace-json']:
+            with self.subTest(mode=mode):
+                (self.path/'calls').write_text('')
+                result = self.run_install(mode)
+                self.assertNotEqual(result.returncode, 0)
+                if mode == 'get-error': self.assertEqual(result.returncode, 7)
+                self.assertEqual(self.inventory(), [])
+                calls = [json.loads(line) for line in (self.path/'calls').read_text().splitlines()]
+                self.assertFalse(any('apply' in call or 'delete' in call for call in calls))
+
+    def test_upgrade_and_rollback_only_touch_selected_resources(self):
+        self.assertEqual(self.run_install().returncode, 0)
+        # An additional owned object is outside this change, as are the old Services/RBAC/PVC.
+        unrelated = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {
+            'name': 'oficina-observability-unrelated', 'namespace': 'oficina-staging',
+            'labels': {'app.kubernetes.io/part-of': 'oficina-observability'}}, 'data': {'keep': 'yes'}}
+        old = self.inventory() + [unrelated]
+        (self.path/'cluster.json').write_text(json.dumps(old))
+        attempts = set((self.path/'state').glob('attempt.*'))
+        result = self.run_install(args=['upgrade'])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        attempt, = set((self.path/'state').glob('attempt.*')) - attempts
+        desired = json.loads((attempt/'desired.yaml').read_text())['items']
+        ids = {(x['kind'], x['metadata']['name']) for x in desired}
+        self.assertNotIn(('PersistentVolumeClaim', 'oficina-observability-prometheus'), ids)
+        self.assertNotIn(('Service', 'oficina-observability-grafana'), ids)
+        self.assertFalse(any(x[0] in {'Secret', 'Role', 'RoleBinding', 'ServiceAccount'} for x in ids))
+        # A new unrelated object created after the snapshot must also survive rollback.
+        later = copy.deepcopy(unrelated); later['metadata']['name'] += '-later'
+        (self.path/'cluster.json').write_text(json.dumps(self.inventory() + [later]))
+        result = self.run_install(args=['rollback', str(attempt)])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.inventory(), old + [later])
+
     def test_success_and_idempotence(self):
         first = self.run_install(); self.assertEqual(first.returncode, 0, first.stderr)
         calls = [json.loads(line) for line in (self.path/'calls').read_text().splitlines()]
@@ -257,7 +309,7 @@ class InstallerTests(unittest.TestCase):
     def test_churn_never_accepts_single_healthy_sample(self):
         result = self.run_install('churn')
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual([x['kind'] for x in self.inventory()], ['PersistentVolumeClaim'])
+        self.assertEqual([x['kind'] for x in self.inventory()], ['PersistentVolumeClaim', 'PersistentVolumeClaim'])
 
     def test_override_cannot_hide_missing_pod(self):
         self.env['EXPECTED_API_PODS'] = '2'
@@ -304,14 +356,14 @@ class InstallerTests(unittest.TestCase):
     def test_rollout_failure_preserves_pvc(self):
         result = self.run_install('rollout')
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual([x['kind'] for x in self.inventory()], ['PersistentVolumeClaim'])
+        self.assertEqual([x['kind'] for x in self.inventory()], ['PersistentVolumeClaim', 'PersistentVolumeClaim'])
 
     def test_target_failure_rolls_back(self):
         pods, response = fixtures(); response['data']['activeTargets'].pop()
         (self.path/'targets.json').write_text(json.dumps(response))
         result = self.run_install()
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual([x['kind'] for x in self.inventory()], ['PersistentVolumeClaim'])
+        self.assertEqual([x['kind'] for x in self.inventory()], ['PersistentVolumeClaim', 'PersistentVolumeClaim'])
 
     def test_update_failure_restores_snapshot(self):
         self.assertEqual(self.run_install().returncode, 0)
@@ -345,7 +397,7 @@ class InstallerTests(unittest.TestCase):
         attempt = next((self.path/'state').glob('attempt.*'))
         result = self.run_install(args=['rollback', str(attempt)])
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual([x['kind'] for x in self.inventory()], ['PersistentVolumeClaim'])
+        self.assertEqual([x['kind'] for x in self.inventory()], ['PersistentVolumeClaim', 'PersistentVolumeClaim'])
 
 
 class SecretTests(unittest.TestCase):

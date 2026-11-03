@@ -1,0 +1,397 @@
+{
+  "uid": "oficina-staging-business",
+  "title": "Oficina staging — Negócio",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "tags": [
+    "oficina",
+    "staging",
+    "business"
+  ],
+  "timezone": "America/Sao_Paulo",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "OS criadas hoje — America/Sao_Paulo",
+      "type": "timeseries",
+      "description": "Dia civil local, não últimas 24h. Visão eventual (max entre réplicas). Sem promessa de total diário histórico fechado.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(oficina_work_orders_created_today{job=\"oficina-api\",namespace=\"oficina-staging\"})",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Intervalos concluídos por status",
+      "type": "timeseries",
+      "description": "Histórico real disponível; não inclui intervalos abertos nem histórico sintético.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (status) (oficina_work_order_status_completed_intervals{job=\"oficina-api\",namespace=\"oficina-staging\"})",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Duração média CONCLUÍDA por status",
+      "type": "timeseries",
+      "description": "Soma/contagem dos intervalos concluídos. 0/0 fica sem dado; não é percentil.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (status) (oficina_work_order_status_completed_duration_seconds{job=\"oficina-api\",namespace=\"oficina-staging\"}) / max by (status) (oficina_work_order_status_completed_intervals{job=\"oficina-api\",namespace=\"oficina-staging\"})",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Idade média ABERTA por status",
+      "type": "timeseries",
+      "description": "Idade no snapshot, separada da duração concluída. FINALIZED aguarda entrega; DELIVERED/BUDGET_REJECTED não acumulam idade.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (status) (oficina_work_order_status_open_age_seconds{job=\"oficina-api\",namespace=\"oficina-staging\"}) / max by (status) (oficina_work_order_status_open_intervals{job=\"oficina-api\",namespace=\"oficina-staging\"})",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Intervalos abertos por status",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (status) (oficina_work_order_status_open_intervals{job=\"oficina-api\",namespace=\"oficina-staging\"})",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Falhas de processamento na última hora — por etapa",
+      "type": "timeseries",
+      "description": "attempt = tentativas observadas; batch = lotes abortados. Não somar etapas como mensagens únicas.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (stage) (increase(oficina_notification_processing_failures_total{job=\"oficina-api\",namespace=\"oficina-staging\"}[1h]))",
+          "legendFormat": "{{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Outbox — PENDING",
+      "type": "timeseries",
+      "description": "Estoque do banco deduplicado por max, não counter de tentativas.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(oficina_notification_outbox_pending{job=\"oficina-api\",namespace=\"oficina-staging\"})",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Outbox — PROCESSING",
+      "type": "timeseries",
+      "description": "Estoque do banco deduplicado por max, não counter de tentativas.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(oficina_notification_outbox_processing{job=\"oficina-api\",namespace=\"oficina-staging\"})",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Outbox — SENT",
+      "type": "timeseries",
+      "description": "Estoque do banco deduplicado por max, não counter de tentativas.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(oficina_notification_outbox_sent{job=\"oficina-api\",namespace=\"oficina-staging\"})",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Outbox — FAILED",
+      "type": "timeseries",
+      "description": "Estoque do banco deduplicado por max, não counter de tentativas.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(oficina_notification_outbox_failed{job=\"oficina-api\",namespace=\"oficina-staging\"})",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Falhas HTTP 5xx por segundo",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"oficina-api\",namespace=\"oficina-staging\",status=~\"5..\"}[5m]))",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Idade do snapshot por réplica",
+      "type": "timeseries",
+      "description": "Após 120s os gauges expiram (NaN). Falta de dado não significa zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - oficina_business_metrics_snapshot_timestamp_seconds{job=\"oficina-api\",namespace=\"oficina-staging\"}",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Falhas de atualização por segundo",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 48
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(oficina_business_metrics_refresh_failures_total{job=\"oficina-api\",namespace=\"oficina-staging\"}[5m]))",
+          "legendFormat": ""
+        }
+      ]
+    }
+  ]
+}

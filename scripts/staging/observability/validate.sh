@@ -15,10 +15,10 @@ python3 - "$TEMP_DIR/rules.yaml" <<'PY'
 import json,sys,yaml
 from pathlib import Path
 path=Path('k8s/staging/observability/config')
-dashboard=json.loads((path/'dashboard.json').read_text())
-rules=[{'record':f'check_panel_{panel["id"]}_{i}',
+rules=[{'record':f'check_{file.stem.replace("-", "_")}_{panel["id"]}_{i}',
         'expr':target['expr'].replace('$__rate_interval','1m')}
-       for panel in dashboard['panels'] for i,target in enumerate(panel['targets'])]
+       for file in path.glob('*dashboard*.json')
+       for panel in json.loads(file.read_text())['panels'] for i,target in enumerate(panel['targets'])]
 Path(sys.argv[1]).write_text(yaml.safe_dump({'groups':[{'name':'dashboard-syntax','rules':rules}]}))
 PY
 PROMETHEUS=$(python3 - <<'PY'
@@ -28,11 +28,23 @@ with open('k8s/staging/observability/prometheus.yaml') as f:
 PY
 )
 docker run --rm --network none --entrypoint /bin/promtool \
-    -v "$ROOT/k8s/staging/observability/config/prometheus.yml:/config/prometheus.yml:ro" \
-    "$PROMETHEUS" check config --syntax-only /config/prometheus.yml
+    -v "$ROOT/k8s/staging/observability/config:/etc/prometheus:ro" \
+    "$PROMETHEUS" check config --syntax-only /etc/prometheus/prometheus.yml
 # mktemp defaults to 0700; mount only the readable file for non-root promtool.
 chmod 644 "$TEMP_DIR/rules.yaml"
 docker run --rm --network none --entrypoint /bin/promtool \
     -v "$TEMP_DIR/rules.yaml:/rules.yaml:ro" "$PROMETHEUS" check rules /rules.yaml
+docker run --rm --network none --entrypoint /bin/promtool \
+    -v "$ROOT:/work:ro" -w /work "$PROMETHEUS" \
+    test rules scripts/staging/observability/alerts.test.yml
+TEMPO=$(python3 - <<'PY'
+import yaml
+with open('k8s/staging/observability/tempo.yaml') as f:
+    print(next(yaml.safe_load_all(f))['spec']['template']['spec']['containers'][0]['image'])
+PY
+)
+docker run --rm --network none \
+    -v "$ROOT/k8s/staging/observability/config/tempo.yml:/etc/tempo.yml:ro" \
+    "$TEMPO" -config.file=/etc/tempo.yml -config.verify=true
 docker run --rm -i ghcr.io/yannh/kubeconform@sha256:0925177fb05b44ce18574076141b5c3d83235e1904d3f952182ac99ddc45762c \
     -strict -summary -kubernetes-version 1.34.0 <"$TEMP_DIR/rendered.yaml"

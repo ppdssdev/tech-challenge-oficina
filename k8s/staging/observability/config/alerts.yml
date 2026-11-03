@@ -1,0 +1,71 @@
+groups:
+- name: oficina-staging
+  rules:
+  - alert: OficinaApiUnavailable
+    expr: (up{job="oficina-api",namespace="oficina-staging"} == 0) or absent(up{job="oficina-api",namespace="oficina-staging"})
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: API sem scrape saudável ou sem targets descobertos.
+  - alert: OficinaNotificationProcessingFailures
+    expr: sum by (stage) (increase(oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging"}[5m]))
+      > 0
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: Falhas de processamento observadas; verificar stage, sem somar etapas.
+  - alert: OficinaHttpServerErrors
+    expr: sum(rate(http_server_requests_seconds_count{job="oficina-api",namespace="oficina-staging",status=~"5.."}[5m]))
+      > 0
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: API apresenta respostas HTTP 5xx.
+  - alert: OficinaBusinessRefreshFailures
+    expr: sum(increase(oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging"}[5m]))
+      > 0
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: Falha na atualização do snapshot de negócio.
+  - alert: OficinaBusinessSnapshotUnavailable
+    expr: (time() - oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging"}
+      > 120) or (oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging"}
+      != oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging"})
+      or ((up{job="oficina-api",namespace="oficina-staging"} == 1) unless on (job,
+      namespace, instance) oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging"})
+      or absent(oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging"})
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: Snapshot de negócio ausente, NaN ou mais velho que 120s.
+  - alert: OficinaProcessingMetricsMissing
+    expr: label_replace(((up{job="oficina-api",namespace="oficina-staging"} == 1)
+      unless on (job, namespace, instance) oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",stage="attempt"}),
+      "stage", "attempt", "job", ".*") or absent(oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",stage="attempt"})
+      or label_replace(((up{job="oficina-api",namespace="oficina-staging"} == 1) unless
+      on (job, namespace, instance) oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",stage="batch"}),
+      "stage", "batch", "job", ".*") or absent(oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",stage="batch"})
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: Counter de processamento ausente; verificar versão instrumentada da
+        API.
+  - alert: OficinaBusinessValuesUnavailable
+    expr: (oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging"}
+      != oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging"})
+      or ((up{job="oficina-api",namespace="oficina-staging"} == 1) unless on (job,
+      namespace, instance) oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging"})
+      or absent(oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging"})
+    for: 3m
+    labels:
+      severity: warning
+    annotations:
+      summary: Valores de negócio ausentes ou NaN; painel sem dado não equivale a
+        zero.
