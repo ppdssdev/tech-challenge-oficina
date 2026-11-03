@@ -469,6 +469,10 @@ mvn spring-boot:run
 
 ---
 
+## Observabilidade AWS staging
+
+A stack privada de Prometheus/Grafana tem manifests independentes, instalação manual com rollback e acesso por SSM. Consulte o [runbook de observabilidade staging](docs/staging/observability.md).
+
 ## Observabilidade local
 
 A API publica métricas do Spring Boot Actuator no endpoint `/actuator/prometheus` usando Micrometer Prometheus. O Prometheus coleta essas métricas a cada 15 segundos, e o Grafana recebe automaticamente o datasource Prometheus e o dashboard versionado **Oficina API - Observabilidade local**.

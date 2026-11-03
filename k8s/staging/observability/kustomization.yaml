@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: oficina-staging
+labels:
+- pairs:
+    app.kubernetes.io/part-of: oficina-observability
+  includeSelectors: false
+resources:
+- rbac.yaml
+- prometheus.yaml
+- grafana.yaml
+configMapGenerator:
+- name: oficina-observability-prometheus
+  files:
+  - prometheus.yml=config/prometheus.yml
+- name: oficina-observability-grafana
+  files:
+  - datasources.yml=config/datasources.yml
+  - dashboards.yml=config/dashboards.yml
+- name: oficina-observability-dashboard
+  files:
+  - oficina-staging.json=config/dashboard.json

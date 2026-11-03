@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oficina-observability-grafana
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: oficina-observability-grafana
+  template:
+    metadata:
+      labels:
+        app: oficina-observability-grafana
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: grafana
+        image: grafana/grafana:12.4.13@sha256:f9452baa61968e54fafaaab493a2f97724b66def07a61659897566c6f085b80f
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 3000
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 384Mi
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/grafana
+        - name: tmp
+          mountPath: /tmp
+        - name: provisioning
+          mountPath: /etc/grafana/provisioning/datasources/datasources.yml
+          subPath: datasources.yml
+          readOnly: true
+        - name: provisioning
+          mountPath: /etc/grafana/provisioning/dashboards/dashboards.yml
+          subPath: dashboards.yml
+          readOnly: true
+        - name: dashboard
+          mountPath: /etc/grafana/dashboards
+          readOnly: true
+        - name: admin
+          mountPath: /etc/grafana/admin
+          readOnly: true
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: oficina-observability-grafana-admin
+              key: username
+        - name: GF_SECURITY_ADMIN_PASSWORD__FILE
+          value: /etc/grafana/admin/password
+        - name: GF_AUTH_ANONYMOUS_ENABLED
+          value: 'false'
+        - name: GF_USERS_ALLOW_SIGN_UP
+          value: 'false'
+        - name: GF_ANALYTICS_REPORTING_ENABLED
+          value: 'false'
+        - name: GF_ANALYTICS_CHECK_FOR_UPDATES
+          value: 'false'
+        - name: GF_PLUGINS_PREINSTALL_DISABLED
+          value: 'true'
+        - name: GF_LOG_MODE
+          value: console
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 60
+      volumes:
+      - name: data
+        emptyDir:
+          sizeLimit: 256Mi
+      - name: tmp
+        emptyDir:
+          sizeLimit: 64Mi
+      - name: provisioning
+        configMap:
+          name: oficina-observability-grafana
+      - name: dashboard
+        configMap:
+          name: oficina-observability-dashboard
+      - name: admin
+        secret:
+          secretName: oficina-observability-grafana-admin
+          defaultMode: 288
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oficina-observability-grafana
+spec:
+  type: ClusterIP
+  selector:
+    app: oficina-observability-grafana
+  ports:
+  - name: http
+    port: 3000
+    targetPort: http
