@@ -9,10 +9,12 @@ resources:
 - rbac.yaml
 - prometheus.yaml
 - grafana.yaml
+- tempo.yaml
 configMapGenerator:
 - name: oficina-observability-prometheus
   files:
   - prometheus.yml=config/prometheus.yml
+  - alerts.yml=config/alerts.yml
 - name: oficina-observability-grafana
   files:
   - datasources.yml=config/datasources.yml
@@ -20,3 +22,7 @@ configMapGenerator:
 - name: oficina-observability-dashboard
   files:
   - oficina-staging.json=config/dashboard.json
+  - oficina-business.json=config/business-dashboard.json
+- name: oficina-observability-tempo
+  files:
+  - tempo.yml=config/tempo.yml

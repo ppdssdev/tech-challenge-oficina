@@ -1,0 +1,439 @@
+rule_files:
+- ../../../k8s/staging/observability/config/alerts.yml
+evaluation_interval: 1m
+tests:
+- name: Healthy zero counters do not alert
+  interval: 1m
+  input_series:
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 1x15
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0+60x15
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 2x15
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="batch"}
+    values: '0x15'
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  alert_rule_test:
+  - eval_time: 6m
+    alertname: OficinaApiUnavailable
+    exp_alerts: []
+  - eval_time: 6m
+    alertname: OficinaNotificationProcessingFailures
+    exp_alerts: []
+  - eval_time: 6m
+    alertname: OficinaHttpServerErrors
+    exp_alerts: []
+  - eval_time: 6m
+    alertname: OficinaBusinessRefreshFailures
+    exp_alerts: []
+  - eval_time: 6m
+    alertname: OficinaBusinessSnapshotUnavailable
+    exp_alerts: []
+  - eval_time: 6m
+    alertname: OficinaProcessingMetricsMissing
+    exp_alerts: []
+  - eval_time: 6m
+    alertname: OficinaBusinessValuesUnavailable
+    exp_alerts: []
+- name: No discovered API targets
+  interval: 1m
+  input_series: []
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: OficinaApiUnavailable
+    exp_alerts: []
+  - eval_time: 3m
+    alertname: OficinaApiUnavailable
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        job: oficina-api
+        namespace: oficina-staging
+      exp_annotations:
+        summary: API sem scrape saudável ou sem targets descobertos.
+  - eval_time: 3m
+    alertname: OficinaBusinessSnapshotUnavailable
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        job: oficina-api
+        namespace: oficina-staging
+      exp_annotations:
+        summary: Snapshot de negócio ausente, NaN ou mais velho que 120s.
+- name: Scrape down and recovered
+  interval: 1m
+  input_series:
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0+60x15
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 2x15
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="batch"}
+    values: '0x15'
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0x4 1x10
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: OficinaApiUnavailable
+    exp_alerts: []
+  - eval_time: 3m
+    alertname: OficinaApiUnavailable
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        job: oficina-api
+        namespace: oficina-staging
+        instance: api1:8080
+        pod: api1
+      exp_annotations:
+        summary: API sem scrape saudável ou sem targets descobertos.
+  - eval_time: 6m
+    alertname: OficinaApiUnavailable
+    exp_alerts: []
+- name: Processing failures attempt
+  interval: 1m
+  input_series:
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 1x15
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0+60x15
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 2x15
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="batch"}
+    values: '0x15'
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: 0+1x15
+  alert_rule_test:
+  - eval_time: 0m
+    alertname: OficinaNotificationProcessingFailures
+    exp_alerts: []
+  - eval_time: 3m
+    alertname: OficinaNotificationProcessingFailures
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        stage: attempt
+      exp_annotations:
+        summary: Falhas de processamento observadas; verificar stage, sem somar etapas.
+- name: Processing failures batch
+  interval: 1m
+  input_series:
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 1x15
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0+60x15
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 2x15
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: '0x15'
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="batch"}
+    values: 0+1x15
+  alert_rule_test:
+  - eval_time: 0m
+    alertname: OficinaNotificationProcessingFailures
+    exp_alerts: []
+  - eval_time: 3m
+    alertname: OficinaNotificationProcessingFailures
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        stage: batch
+      exp_annotations:
+        summary: Falhas de processamento observadas; verificar stage, sem somar etapas.
+- name: 5xx responses
+  interval: 1m
+  input_series:
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 1x15
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0+60x15
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 2x15
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="batch"}
+    values: '0x15'
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  - series: http_server_requests_seconds_count{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",status="500"}
+    values: 0+1x15
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: OficinaHttpServerErrors
+    exp_alerts: []
+  - eval_time: 4m
+    alertname: OficinaHttpServerErrors
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+      exp_annotations:
+        summary: API apresenta respostas HTTP 5xx.
+- name: 4xx validation responses are not server failures
+  interval: 1m
+  input_series:
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 1x15
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0+60x15
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 2x15
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="batch"}
+    values: '0x15'
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  - series: http_server_requests_seconds_count{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",status="400"}
+    values: 0+1x15
+  alert_rule_test:
+  - eval_time: 6m
+    alertname: OficinaHttpServerErrors
+    exp_alerts: []
+- name: Refresh failure
+  interval: 1m
+  input_series:
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 1x15
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0+60x15
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 2x15
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="batch"}
+    values: '0x15'
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0+1x15
+  alert_rule_test:
+  - eval_time: 3m
+    alertname: OficinaBusinessRefreshFailures
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+      exp_annotations:
+        summary: Falha na atualização do snapshot de negócio.
+- name: Expired snapshot
+  interval: 1m
+  input_series:
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 1x15
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 2x15
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="batch"}
+    values: '0x15'
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  alert_rule_test:
+  - eval_time: 6m
+    alertname: OficinaBusinessSnapshotUnavailable
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        job: oficina-api
+        namespace: oficina-staging
+        instance: api1:8080
+        pod: api1
+      exp_annotations:
+        summary: Snapshot de negócio ausente, NaN ou mais velho que 120s.
+- name: Initial snapshot NaN
+  interval: 1m
+  input_series:
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 1x15
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 2x15
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="batch"}
+    values: '0x15'
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: NaN NaN NaN NaN NaN NaN NaN
+  alert_rule_test:
+  - eval_time: 6m
+    alertname: OficinaBusinessSnapshotUnavailable
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        job: oficina-api
+        namespace: oficina-staging
+        instance: api1:8080
+        pod: api1
+      exp_annotations:
+        summary: Snapshot de negócio ausente, NaN ou mais velho que 120s.
+- name: Missing snapshot in one healthy replica
+  interval: 1m
+  input_series:
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 1x15
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0+60x15
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 2x15
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="batch"}
+    values: '0x15'
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api2:8080",pod="api2"}
+    values: 1x15
+  alert_rule_test:
+  - eval_time: 3m
+    alertname: OficinaBusinessSnapshotUnavailable
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        job: oficina-api
+        namespace: oficina-staging
+        instance: api2:8080
+        pod: api2
+      exp_annotations:
+        summary: Snapshot de negócio ausente, NaN ou mais velho que 120s.
+- name: Expired values NaN
+  interval: 1m
+  input_series:
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 1x15
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0+60x15
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="batch"}
+    values: '0x15'
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: NaN NaN NaN NaN NaN NaN NaN
+  alert_rule_test:
+  - eval_time: 4m
+    alertname: OficinaBusinessValuesUnavailable
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        job: oficina-api
+        namespace: oficina-staging
+        instance: api1:8080
+        pod: api1
+      exp_annotations:
+        summary: Valores de negócio ausentes ou NaN; painel sem dado não equivale a zero.
+- name: Missing batch counter in one replica
+  interval: 1m
+  input_series:
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 1x15
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0+60x15
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 2x15
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: '0x15'
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api2:8080",pod="api2",stage="batch"}
+    values: '0x15'
+  alert_rule_test:
+  - eval_time: 6m
+    alertname: OficinaProcessingMetricsMissing
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        job: oficina-api
+        namespace: oficina-staging
+        instance: api1:8080
+        pod: api1
+        stage: batch
+      exp_annotations:
+        summary: Counter de processamento ausente; verificar versão instrumentada da API.
+- name: Counter reset without new failures
+  interval: 1m
+  input_series:
+  - series: up{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 1x15
+  - series: oficina_business_metrics_snapshot_timestamp_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 0+60x15
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 2x15
+  - series: oficina_business_metrics_refresh_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: '0x15'
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="attempt"}
+    values: 5 5 0 0 0 0 0
+  - series: oficina_notification_processing_failures_total{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",stage="batch"}
+    values: 5 5 0 0 0 0 0
+  alert_rule_test:
+  - eval_time: 6m
+    alertname: OficinaNotificationProcessingFailures
+    exp_alerts: []
+- name: Shared gauges max, completed duration separate from open age; zero count is NaN
+  interval: 1m
+  input_series:
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1"}
+    values: 7x10
+  - series: oficina_work_order_status_completed_intervals{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",status="IN_EXECUTION"}
+    values: 2x10
+  - series: oficina_work_order_status_completed_duration_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",status="IN_EXECUTION"}
+    values: 60x10
+  - series: oficina_work_order_status_open_intervals{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",status="IN_EXECUTION"}
+    values: 1x10
+  - series: oficina_work_order_status_open_age_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",status="IN_EXECUTION"}
+    values: 600x10
+  - series: oficina_work_order_status_completed_intervals{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",status="RECEIVED"}
+    values: '0x10'
+  - series: oficina_work_order_status_completed_duration_seconds{job="oficina-api",namespace="oficina-staging",instance="api1:8080",pod="api1",status="RECEIVED"}
+    values: '0x10'
+  - series: oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging",instance="api2:8080",pod="api2"}
+    values: 7x10
+  - series: oficina_work_order_status_completed_intervals{job="oficina-api",namespace="oficina-staging",instance="api2:8080",pod="api2",status="IN_EXECUTION"}
+    values: 2x10
+  - series: oficina_work_order_status_completed_duration_seconds{job="oficina-api",namespace="oficina-staging",instance="api2:8080",pod="api2",status="IN_EXECUTION"}
+    values: 60x10
+  - series: oficina_work_order_status_open_intervals{job="oficina-api",namespace="oficina-staging",instance="api2:8080",pod="api2",status="IN_EXECUTION"}
+    values: 1x10
+  - series: oficina_work_order_status_open_age_seconds{job="oficina-api",namespace="oficina-staging",instance="api2:8080",pod="api2",status="IN_EXECUTION"}
+    values: 600x10
+  - series: oficina_work_order_status_completed_intervals{job="oficina-api",namespace="oficina-staging",instance="api2:8080",pod="api2",status="RECEIVED"}
+    values: '0x10'
+  - series: oficina_work_order_status_completed_duration_seconds{job="oficina-api",namespace="oficina-staging",instance="api2:8080",pod="api2",status="RECEIVED"}
+    values: '0x10'
+  alert_rule_test: []
+  promql_expr_test:
+  - expr: max(oficina_work_orders_created_today{job="oficina-api",namespace="oficina-staging"})
+    eval_time: 6m
+    exp_samples:
+    - labels: '{}'
+      value: 7
+  - expr: (max by (status) (oficina_work_order_status_completed_duration_seconds{job="oficina-api",namespace="oficina-staging"}) / max by (status)
+      (oficina_work_order_status_completed_intervals{job="oficina-api",namespace="oficina-staging"})) and on (status) (max by (status) (oficina_work_order_status_completed_intervals{job="oficina-api",namespace="oficina-staging"})
+      > 0)
+    eval_time: 6m
+    exp_samples:
+    - labels: '{status="IN_EXECUTION"}'
+      value: 30
+  - expr: max by (status) (oficina_work_order_status_open_age_seconds{job="oficina-api",namespace="oficina-staging"}) / max by (status) (oficina_work_order_status_open_intervals{job="oficina-api",namespace="oficina-staging"})
+    eval_time: 6m
+    exp_samples:
+    - labels: '{status="IN_EXECUTION"}'
+      value: 600
+  - expr: count((max by (status) (oficina_work_order_status_completed_duration_seconds{job="oficina-api",namespace="oficina-staging"}) / max by
+      (status) (oficina_work_order_status_completed_intervals{job="oficina-api",namespace="oficina-staging"})) != (max by (status) (oficina_work_order_status_completed_duration_seconds{job="oficina-api",namespace="oficina-staging"})
+      / max by (status) (oficina_work_order_status_completed_intervals{job="oficina-api",namespace="oficina-staging"})))
+    eval_time: 6m
+    exp_samples:
+    - labels: '{}'
+      value: 1
