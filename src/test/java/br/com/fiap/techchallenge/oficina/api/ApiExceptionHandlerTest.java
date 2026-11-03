@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ApiExceptionHandlerTest {
 
-    private final ApiExceptionHandler handler = new ApiExceptionHandler();
+    private final ApiExceptionHandler handler = new ApiExceptionHandler(org.mockito.Mockito.mock(io.micrometer.tracing.Tracer.class));
     private final MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/test");
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -23,11 +23,11 @@ class ApiExceptionHandlerTest {
         request.addHeader("X-Correlation-Id", value);
         var body = handler.handleUnexpected(new RuntimeException("secret"), request).getBody();
         assertThat(body.traceId()).isNotEqualTo(value);
-        assertThat(java.util.UUID.fromString(body.traceId()).version()).isEqualTo(4);
+        assertThat(body.traceId()).isNull();
     }
 
     @Test
-    void keepsValidCorrelationAndOmitsSensitiveLogData() {
+    void doesNotUseCorrelationHeaderAsTraceAndOmitsSensitiveLogData() {
         String id = "e53eeffe-36c7-46bb-a545-1a2056d243bf";
         request.addHeader("X-Correlation-Id", id);
         request.setRequestURI("/api/52998224725/11.222.333/0001-81");
@@ -40,7 +40,7 @@ class ApiExceptionHandlerTest {
         try {
             var body = handler.handleUnexpected(new RuntimeException("52998224725 credential=private"), request).getBody();
             handler.handleBusiness(new BusinessException("11222333000181 credential=private"), request);
-            assertThat(body.traceId()).isEqualTo(id);
+            assertThat(body.traceId()).isNull();
             assertThat(body.path()).isEqualTo("[unmatched]");
             assertThat(appender.list).hasSize(3).allSatisfy(event -> {
                 assertThat(event.getFormattedMessage()).doesNotContain("52998224725", "11222333000181", "private");

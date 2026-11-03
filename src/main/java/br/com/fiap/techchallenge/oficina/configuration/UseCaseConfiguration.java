@@ -1,5 +1,7 @@
 package br.com.fiap.techchallenge.oficina.configuration;
 
+import br.com.fiap.techchallenge.oficina.adapters.out.observability.ObservedNotificationProcessing;
+import io.micrometer.core.instrument.MeterRegistry;
 import br.com.fiap.techchallenge.oficina.application.port.in.AddWorkOrderItemsUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.AuthenticateUserUseCase;
 import br.com.fiap.techchallenge.oficina.application.port.in.CalculateWorkOrderMetricsUseCase;
@@ -121,14 +123,16 @@ public class UseCaseConfiguration {
     }
 
     @Bean ProcessNotificationOutboxUseCase processNotificationOutbox(
+        MeterRegistry registry,
         NotificationOutboxPort outbox,
         NotificationPort notifications,
         @Value("${app.notification.outbox.batch-size:10}") int batchSize,
         @Value("${app.notification.outbox.max-attempts:3}") int maxAttempts,
         @Value("${app.notification.outbox.processing-timeout-seconds:300}") int processingTimeoutSeconds
     ) {
-        return new ProcessNotificationOutboxService(
-            outbox, notifications, batchSize, maxAttempts, processingTimeoutSeconds
+        return new ObservedNotificationProcessing(
+            new ProcessNotificationOutboxService(outbox, notifications, batchSize, maxAttempts, processingTimeoutSeconds),
+            registry
         );
     }
 

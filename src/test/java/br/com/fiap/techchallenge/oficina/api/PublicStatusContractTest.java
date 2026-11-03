@@ -32,7 +32,7 @@ class PublicStatusContractTest {
                 } else {
                     assertThat(context).doesNotHaveBean(LegacyPublicWorkOrderController.class);
                 }
-                var mvc = builder.setControllerAdvice(new ApiExceptionHandler()).build();
+                var mvc = builder.setControllerAdvice(new ApiExceptionHandler(org.mockito.Mockito.mock(io.micrometer.tracing.Tracer.class))).build();
                 mvc.perform(get("/api/v1/public/work-orders/OS-X/status").param("document", "52998224725"))
                     .andExpect(profile.equals("local") ? status().isNotFound() : status().isMethodNotAllowed());
                 mvc.perform(post("/api/v1/public/work-orders/OS-X/status")
