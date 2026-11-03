@@ -1,108 +1,152 @@
-# Release local de staging — preparação bloqueada
+# Release local de staging
 
-Auditoria do checkout base `7b47790`: o `render.sh` citado na solicitação não
-existe neste checkout. Não foi encontrado documento SSM versionado, transporte
-validado de manifests nem procedimento de autenticação ECR do nó. A estratégia
-em `docs/fase3/cicd-strategy.md` apenas propõe documento fixo/allowlist. Não se
-pode comprovar os pré-requisitos Kubernetes sem esse acesso. Esta entrega é um
-preflight parcial, não um fluxo de publicação operacional.
+## Correção da auditoria
 
-O Dockerfile usa Java 21, Maven multi-stage, usuário sem root e diretório de logs
-restritos. Suas imagens base não estão fixadas por digest e dependências de pacote
-podem mudar: rebuilds do mesmo commit não são garantidamente idênticos. A CI atual
-executa Maven, build Docker e validação de schemas Kubernetes; permanece intacta.
-O overlay staging contém Deployment, Service e Namespace; não contém HPA e fixa
-replicas=1. Aplicá-lo integralmente pode interferir na configuração existente.
-O Job de migração é separado; Flyway do runtime está desligado. Nenhum desses
-recursos foi alterado por esta entrega.
+O checkout original era main `7b47790`, com origin/main desatualizado. Em 2026-11-03,
+`git fetch origin main` trouxe `045da59`; `git ls-tree origin/main
+scripts/staging/render.sh` confirmou blob `c2d80eec9853dfe7c0683c52078f33ce022ac21e`.
+A branch integrou main por merge, preservando `8a60d18` e arquivos locais.
+O renderizador existe e é reutilizado sem alterações. O HPA também existe e o
+Deployment não fixa mais replicas. O diagnóstico anterior era limitado por uma
+referência remota desatualizada.
 
-## Uso atual
+## Preparação offline e publicação
 
-Em checkout limpo, com Bash, Git, Python 3, Docker e AWS CLI v2 compatível com
-`configure export-credentials`, renove a sessão temporária do perfil
-`oficina-staging` pelo mecanismo local já autorizado. O script exige token de
-sessão e expiração superior a 30 minutos. Não persiste nem imprime credenciais.
-Não use `bash -x`, gravação de terminal ou debug da AWS CLI.
+Requisitos offline: Bash, Git, Python 3 e kubectl com kustomize. Neste ambiente,
+`/tmp/oficina-tools/kubectl` aponta para `/snap/kubectl/current/kubectl`, binário
+já instalado. Executá-lo diretamente para renderização offline funcionou sem
+mudar AppArmor, permissões, serviços ou configuração do sistema. Esse caminho é
+local e temporário; em outra máquina use uma instalação de kubectl verificada.
 
 ```bash
-scripts/staging/release-local.sh --dry-run
+export PATH="/tmp/oficina-tools:$PATH"
+bash scripts/staging/release-local.sh --dry-run
 ```
 
-O padrão é dry-run. Consultas AWS são somente leitura, mas exigem acesso à AWS.
-Nesta tarefa elas foram substituídas por mocks. O plano usa `git-<SHA completo>`;
-exige conta `797781632267`, região `us-east-2`, ECR correto com política IMMUTABLE,
-Docker disponível, checkout limpo e instância `i-0ab373b1ba5c14b3e` online no SSM.
-Falhas e dependências não comprovadas retornam status diferente de zero.
+Dry-run padrão não chama AWS nem Docker, não precisa de credenciais, permite
+checkout sujo e usa digest fictício explicitamente identificado somente para
+validar renderização. Não gera manifest aplicável persistente.
 
-Comando reservado para revisão humana futura:
+Publicação futura autorizada (não executada nesta tarefa):
 
 ```bash
-scripts/staging/release-local.sh --execute
+bash scripts/staging/release-local.sh --execute
 ```
 
-Atualmente esse comando também falha antes de build, login, push ou deploy.
-Não há opção para ignorar o bloqueio. Não há confirmação do operador porque
-nenhuma operação mutante está habilitada. Uma implementação futura deve obter
-confirmação interativa após concluir **todos** os preflights e antes da primeira
-mutação; stdin redirecionado não deve aprovar automaticamente.
+Exige checkout completamente limpo, ferramentas AWS CLI v2, Docker e tar, sessão
+temporária no perfil oficina-staging com 30 minutos restantes, conta/região certas,
+ECR IMMUTABLE sem exceções, tag ainda ausente e SSM Online. Exige terminal e a
+palavra PUBLICAR antes de construir ou autenticar. Constrói somente arquivos do
+commit via git archive para linux/amd64; confirmar compatibilidade do nó antes
+de promover. Bases Docker e pacotes não são fixados por digest: rebuild não é
+bit a bit reproduzível; a tag git-<SHA completo> nunca é sobrescrita. Uma tag já
+existente bloqueia repetição, inclusive após falha posterior ao push.
 
-## Dependências para completar o fluxo
+Credenciais temporárias são verificadas em memória; token ECR passa por stdin e
+configuração Docker fica em diretório restrito removido ao sair. Não usar debug
+ou gravação de terminal. O script consulta o digest real após push e valida a
+renderização. Não executa Kubernetes, migrações ou deploy. Se uma falha ocorrer
+após push, a imagem pode permanecer no ECR; não a excluir automaticamente.
 
-1. Recuperar o renderizador original e seu contrato de argumentos da revisão
-   correta, sem incorporar ou modificar as quatro PRs OIDC.
-2. Identificar o documento SSM aprovado, versão/hash, parâmetros permitidos,
-   transporte existente e evidência de validação. Não passar credenciais,
-   kubeconfig ou manifests inline em Run Command, nem inventar bucket/transporte.
-3. Pelo canal aprovado, verificar namespace, Deployment/container `api`, acesso
-   ao ECR no nó, arquitetura, métricas/HPA, probes, capacidade, Secrets e ConfigMaps
-   referenciados. Consultar somente existência/chaves necessárias, nunca imprimir
-   valores. Registrar digest anterior e configuração não sensível da release.
-4. Após confirmação, construir do commit limpo para a arquitetura comprovada,
-   usar configuração Docker temporária com permissões restritas, autenticar por
-   stdin, publicar a tag imutável e consultar `imageDigest` no ECR. Se a tag já
-   existir, não sobrescrever: verificar proveniência antes de reutilizar. Exigir
-   formato `sha256:` com 64 hexadecimais e usar o renderizador recuperado.
-5. Revisar diff contra o cluster: preservar HPA, replicas geridas pelo HPA,
-   Secrets, ConfigMaps e configurações existentes. Nunca usar prune/delete ou
-   aplicar Job de migração. Mudanças de schema exigem aprovação independente.
-6. Aplicar exclusivamente pelo mecanismo comprovado, verificar status/timeout do
-   comando SSM e rollout. Falha deve interromper a promoção sem rollback automático.
-
-## Validação e rollback pelo canal SSM aprovado
-
-Os comandos abaixo são verificações no nó, não um mecanismo de transporte:
+Para guardar o runtime após publicação, use o digest real impresso:
 
 ```bash
-sudo k3s kubectl -n oficina-staging rollout status deployment/oficina-api --timeout=300s
-sudo k3s kubectl -n oficina-staging get deployment oficina-api -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].image}'
-sudo k3s kubectl -n oficina-staging get pods -l app=oficina-api -o wide
-sudo k3s kubectl -n oficina-staging get pods -l app=oficina-api -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.containerStatuses[*].imageID}{" "}{.status.containerStatuses[*].ready}{"\n"}{end}'
-sudo k3s kubectl -n oficina-staging get hpa
+umask 077
+IMAGE='797781632267.dkr.ecr.us-east-2.amazonaws.com/oficina-staging-api@sha256:<digest-real>'
+bash scripts/staging/render.sh "$IMAGE" > /tmp/oficina-runtime-reviewed.yaml
 ```
 
-Comparar imagem desejada e imageID de todos os pods com digest publicado (considerar
-manifest list e digest da arquitetura). Exigir todos os pods novos Ready, probes
-configuradas e saudáveis, sem reinícios crescentes; HPA com métricas disponíveis e
-condições saudáveis. Validar readiness/liveness pelo canal privado já aprovado.
-Não abrir portas públicas nem imprimir logs que possam conter dados sensíveis.
+## SSM: alternativa manual condicionada à revisão
 
-Para rollback, confirmar disponibilidade do digest anterior no ECR e compatibilidade
-do código anterior com schema atual; obter aprovação explícita. Recuperar manifests
-anteriores revisados, renderizar com digest anterior e aplicar pelo mesmo canal
-validado, preservando configurações atuais. Repetir todas as verificações. Não
-reverter banco automaticamente, não depender de tag mutável ou de `rollout undo`
-sem verificar sua revisão. Não alterar states, Terraform, RDS, Lambda, IAM ou Secrets
-Manager; não destruir Namespace, HPA, Secrets ou ConfigMaps.
+[AWS documenta Run Command com AWS-RunShellScript](https://docs.aws.amazon.com/systems-manager/latest/userguide/walkthrough-cli.html).
+Não foram consultadas permissões reais nem enviados comandos nesta tarefa.
+SSM Online não comprova autorização SendCommand, sudo, RBAC, pull ECR ou métricas.
+Deploy automático permanece bloqueado. Nenhum manifesto, credencial, Secret ou
+kubeconfig será transportado por Run Command. Para uma promoção **somente de
+imagem**, comandos abaixo operam sobre Deployment existente e preservam HPA,
+Secrets e ConfigMaps. Não substituem aplicação de mudanças estruturais do runtime;
+essas exigem transporte aprovado e revisão de diff próprios.
 
-## Verificação local
+Operador deve validar conta e região antes de qualquer comando, registrar digest
+anterior, conferir compatibilidade de schema e aprovar explicitamente a promoção.
+Para cada operação abaixo, criar `/tmp/oficina-ssm.json` com comandos públicos e
+revisá-lo antes de enviar. Não incluir tokens ou conteúdo de ConfigMaps/Secrets.
+
+Preflight manual (JSON exato):
+
+```bash
+cat > /tmp/oficina-ssm.json <<'JSON'
+{"commands":["set -eu","sudo k3s kubectl get namespace oficina-staging","sudo k3s kubectl -n oficina-staging get deployment oficina-api -o jsonpath='{.spec.template.spec.containers[?(@.name==\"api\")].image}'","sudo k3s kubectl -n oficina-staging get pods -l app=oficina-api -o wide","sudo k3s kubectl -n oficina-staging get hpa","sudo k3s kubectl -n oficina-staging get secret oficina-runtime oficina-application -o name","sudo k3s kubectl -n oficina-staging get configmap oficina-staging-db oficina-rds-ca oficina-customer-jwt -o name","sudo k3s kubectl get nodes -o wide"],"executionTimeout":["600"]}
+JSON
+```
+
+Enviar **apenas após aprovação operacional**; função reutilizada para preflight,
+promoção e rollback, sempre com JSON revisto:
+
+```bash
+ssm_reviewed() {
+  test "$(aws --profile oficina-staging --region us-east-2 sts get-caller-identity --query Account --output text)" = 797781632267 || return 1
+  local id
+  id=$(aws --profile oficina-staging --region us-east-2 ssm send-command \
+    --instance-ids i-0ab373b1ba5c14b3e --document-name AWS-RunShellScript \
+    --parameters file:///tmp/oficina-ssm.json --timeout-seconds 600 \
+    --query Command.CommandId --output text) || return 1
+  aws --profile oficina-staging --region us-east-2 ssm wait command-executed \
+    --command-id "$id" --instance-id i-0ab373b1ba5c14b3e || return 1
+  aws --profile oficina-staging --region us-east-2 ssm get-command-invocation \
+    --command-id "$id" --instance-id i-0ab373b1ba5c14b3e
+}
+ssm_reviewed
+```
+
+Confirmar arquitetura amd64, HPA único com métricas disponíveis, probes existentes,
+referências externas intactas e autenticação ECR do nó previamente configurada.
+Não transportar login ECR do operador para o nó. Ausência de qualquer evidência
+bloqueia promoção. Um timeout do waiter não cancela a execução remota: consultar
+CommandId antes de repetir ou iniciar rollback.
+
+Após aprovação, gerar comando de promoção usando apenas digest validado:
+
+```bash
+export IMAGE='797781632267.dkr.ecr.us-east-2.amazonaws.com/oficina-staging-api@sha256:<digest-real>'
+python3 - <<'PY'
+import json, os, re
+image = os.environ['IMAGE']
+assert re.fullmatch(r'797781632267\.dkr\.ecr\.us-east-2\.amazonaws\.com/oficina-staging-api@sha256:[a-f0-9]{64}', image)
+k = 'sudo k3s kubectl -n oficina-staging '
+commands = ['set -eu', k+'set image deployment/oficina-api api='+image,
+ k+'rollout status deployment/oficina-api --timeout=300s',
+ k+'get pods -l app=oficina-api -o wide', k+'get hpa',
+ k+'''get pods -l app=oficina-api -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.containerStatuses[*].imageID}{" "}{.status.containerStatuses[*].ready}{"\\n"}{end}' ''']
+with open('/tmp/oficina-ssm.json', 'w') as f:
+ json.dump({'commands':commands, 'executionTimeout':['600']}, f)
+PY
+# Revisar arquivo e confirmar aprovação antes desta chamada:
+ssm_reviewed
+```
+
+Exigir sucesso remoto, rollout completo, pods Ready, imageID esperado, probes
+saudáveis, ausência de reinícios crescentes e HPA com métricas e condições
+saudáveis. Validar liveness/readiness e autenticação pelo canal privado já
+aprovado. Não abrir SSH, API Kubernetes ou portas públicas.
+
+Rollback: registrar previamente IMAGE anterior por digest; confirmar sua
+existência no ECR e compatibilidade com schema atual. Após aprovação, repetir
+**o mesmo gerador Python e ssm_reviewed** com IMAGE anterior. Validar novamente
+rollout, imagem efetiva, probes, pods e HPA. Não executar rollout undo sem conferir
+revisão; não reverter schema, Secrets, ConfigMaps ou HPA. Nunca usar prune/delete,
+Job de migração, Terraform apply/destroy/import ou alterar RDS/Lambda/IAM.
+
+## Testes
 
 ```bash
 python3 -m unittest discover -s tests/staging -v
+python3 scripts/staging/test-render.py
 bash -n scripts/staging/release-local.sh
-shellcheck scripts/staging/release-local.sh
-kubectl kustomize k8s/staging
+/tmp/oficina-tools/shellcheck-v0.11.0/shellcheck scripts/staging/release-local.sh scripts/staging/render.sh
+git diff --check
 ```
 
-Mocks cobrem conta/região, estado Git, ECR mutável, SSM offline, argumentos,
-identificador imutável e ausência de comandos mutantes em ambos os modos.
-Não comprovam credenciais reais, IAM, conectividade nem comportamento do cluster.
+Mocks validam dry-run sem chamadas AWS/Docker, guards e bloqueio sem terminal.
+Não validam push real, IAM ou cluster. CI existente permanece preservada; nenhum
+workflow usa credenciais estáticas. PR deve aguardar revisão humana.
