@@ -1,7 +1,9 @@
 # Atualização incremental: Tempo e negócio
 
-Base: main após PR #13. Contratos exclusivos: [negócio PR #16](https://github.com/ppdssdev/tech-challenge-oficina/blob/ff3468a9cf45360f71df382de6a75ffed9fca7d9/docs/fase3/business-metrics-contract.md) e [tracing PR #15](https://github.com/ppdssdev/tech-challenge-oficina/blob/4147de1b26fa4786328aee06ebda326aa96b30a9/docs/fase3/tracing-contract.md).
-Ambas precisam estar na versão da API para aceite completo; esta entrega não altera a API.
+Base atualizada: main em cbfef5c, após integração das PRs #15 e #16.
+Contratos exclusivos: [negócio](../fase3/business-metrics-contract.md) e
+[tracing](../fase3/tracing-contract.md). A integração no Git não comprova implantação:
+ambas precisam estar na versão da API em execução para aceite completo.
 
 `upgrade` exige Prometheus/Grafana existentes, seleciona somente seus Deployments e
 ConfigMaps, mais os recursos novos do Tempo. Não aplica Secret, PVC Prometheus,
