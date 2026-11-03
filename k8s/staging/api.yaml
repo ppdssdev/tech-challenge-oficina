@@ -66,6 +66,7 @@ spec:
             - {name: ca, mountPath: /config/ca, readOnly: true}
             - {name: jwt, mountPath: /config/jwt, readOnly: true}
             - {name: tmp, mountPath: /tmp}
+            - {name: restricted-logs, mountPath: /app/logs/restricted}
           startupProbe:
             httpGet: {path: /actuator/health/liveness, port: http}
             periodSeconds: 5
@@ -88,6 +89,8 @@ spec:
           configMap: {name: oficina-customer-jwt}
         - name: tmp
           emptyDir: {sizeLimit: 128Mi}
+        - name: restricted-logs
+          emptyDir: {sizeLimit: 64Mi}
 ---
 apiVersion: v1
 kind: Service
