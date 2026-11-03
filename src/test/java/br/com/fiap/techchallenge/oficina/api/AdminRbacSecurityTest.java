@@ -24,6 +24,8 @@ import static org.mockito.Mockito.when;
 @WebMvcTest({MetricsController.class, br.com.fiap.techchallenge.oficina.adapters.in.web.CustomerController.class})
 @Import(SecurityConfig.class)
 class AdminRbacSecurityTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    io.micrometer.tracing.Tracer tracer;
 
     @Autowired
     MockMvc mockMvc;

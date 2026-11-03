@@ -41,7 +41,34 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 
+logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      exclude: stack_trace
+  level:
+    # JDBC error details can contain persisted customer data.
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: "OFF"
+
 management:
+  tracing:
+    sampling:
+      probability: 0.1
+    opentelemetry:
+      export:
+        max-queue-size: 2048
+        max-batch-size: 512
+        schedule-delay: 5s
+        timeout: 3s
+  otlp:
+    tracing:
+      transport: http
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+      export:
+        enabled: ${MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED:false}
+      connect-timeout: 1s
+      timeout: 2s
   prometheus:
     metrics:
       export:
