@@ -6,7 +6,7 @@ umask 077
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 KUBECTL=${KUBECTL:-kubectl}
 STATE_DIR=${STATE_DIR:-/var/lib/oficina-observability}
-EXPECTED_API_PODS=${EXPECTED_API_PODS:-auto}
+EXPECTED_API_PODS=${EXPECTED_API_PODS:-3}
 NS=oficina-staging
 OWNER='app.kubernetes.io/part-of=oficina-observability'
 KINDS=deployments,services,configmaps,serviceaccounts,roles,rolebindings,persistentvolumeclaims
@@ -29,6 +29,30 @@ flock -n 9 || { echo 'Outra operação de observabilidade está em execução.' 
 rollouts() {
     k rollout status deployment/oficina-observability-prometheus --timeout=300s &&
         k rollout status deployment/oficina-observability-grafana --timeout=300s
+}
+check_api() {
+    local temp_dir=$1 sample='' previous='' i
+    for ((i=0; i<24; i++)); do
+        if k get deployment oficina-api -o json >"$temp_dir/deployment.json" &&
+            k get pods -l app=oficina-api -o json >"$temp_dir/pods.json" &&
+            k get pods -l app=oficina-api -o json >"$temp_dir/pods-after.json" &&
+            k get deployment oficina-api -o json >"$temp_dir/deployment-after.json" &&
+            sample=$(python3 "$ROOT/scripts/staging/observability/check-targets.py" --api-only \
+                "$temp_dir/pods.json" "$EXPECTED_API_PODS" "$temp_dir/deployment.json" \
+                "$temp_dir/pods-after.json" "$temp_dir/deployment-after.json"); then
+            if [[ "$sample" == "$previous" ]]; then
+                printf 'Preflight API estável: %s\n' "$sample"
+                return 0
+            fi
+            previous=$sample
+            sleep 15
+        else
+            previous=''
+            sleep 5
+        fi
+    done
+    echo 'API não estabilizou no esperado; nenhum recurso da stack foi aplicado.' >&2
+    return 1
 }
 check_targets() {
     local temp_dir=$1
@@ -150,6 +174,7 @@ for item in data['items']:
 (p/'before.json').write_text(json.dumps(data))
 PY
 # Server validation occurs only when an operator executes install on staging.
+check_api "$ATTEMPT"
 k apply --server-side --field-manager=oficina-observability --dry-run=server -f "$ATTEMPT/desired.yaml" >/dev/null
 printf 'Snapshot para rollback: %s\n' "$ATTEMPT"
 MUTATING=true

@@ -49,6 +49,8 @@ O instalador nunca calcula o esperado a partir dos targets encontrados.
 Na EC2: K3s e StorageClass `local-path` já existentes, namespace/API já saudáveis,
 saída existente para os registries, Bash, Python 3, curl, flock e `sudo k3s kubectl`
 com Kustomize. Para transferir: tar, gzip, base64 e sha256sum em ambas as máquinas.
+Git na EC2 é usado somente para conferir o SHA do cabeçalho tar, sem checkout,
+acesso remoto ou credenciais Git.
 Não é necessário Docker, PyYAML, acesso GitHub ou AWS CLI na EC2 com o
 pacote revisado transferido pela sessão SSM existente. Não criar
 NAT, endpoints, portas ou novas regras para instalar esta stack.
@@ -57,6 +59,13 @@ Na estação: AWS CLI e Session Manager Plugin, credenciais/permissões SSM exis
 para a instância, SSM Agent ativo. O operador que roda `kubectl` precisa poder criar
 os recursos listados e ler pods/Deployment no namespace; o kubeconfig root do K3s atende, mas
 não deve ser copiado para a estação. Use o mesmo contexto em todos os comandos.
+
+Pré-requisitos reportados pelo operador via SSM para esta preparação: API 3/3
+Ready, zero reinícios; RAM disponível 5,7 GiB e disco disponível 25 GB;
+StorageClass `local-path`; K3s em `/usr/local/bin/k3s`; Python3, curl, flock e Git
+disponíveis. `kubectl` não está no PATH e checkout em `/opt` não foi confirmado.
+HPA 1–3, atualmente 3, memória 79% para alvo 75%. Essa é uma amostra do operador,
+não garantia de estabilidade futura: o instalador verifica novamente antes de aplicar.
 
 ## Preparar os arquivos — UBUNTU LOCAL
 
@@ -114,7 +123,9 @@ cat > reviewed.tar.gz.b64 <<'OFICINA_REVIEWED_BUNDLE'
 OFICINA_REVIEWED_BUNDLE
 base64 --decode reviewed.tar.gz.b64 > reviewed.tar.gz
 printf '%s  reviewed.tar.gz\n' "$BUNDLE_SHA256" | sha256sum --check --strict -
-tar -xzf reviewed.tar.gz --no-same-owner
+gzip --decompress --stdout reviewed.tar.gz > reviewed.tar
+test "$(git get-tar-commit-id < reviewed.tar)" = "$REVIEWED_SHA"
+tar -xf reviewed.tar --no-same-owner
 printf '%s\n' "$REVIEWED_SHA" > REVIEWED_SHA
 printf 'Diretório revisado: %s\n' "$REVIEW_DIR"
 export KUBECTL="$REVIEW_DIR/scripts/staging/observability/k3s-kubectl.sh"
@@ -126,7 +137,9 @@ sudo "$KUBECTL" -n oficina-staging get hpa
 
 Pare se o checksum falhar. Anote o diretório impresso para reutilizá-lo nas outras
 sessões. `KUBECTL` é **um caminho executável**, nunca `"sudo k3s kubectl"`.
-O wrapper revisado executa `k3s kubectl "$@"`; o `sudo` envolve o helper/instalador.
+O wrapper revisado executa `/usr/local/bin/k3s kubectl "$@"`, sem depender do PATH;
+o `sudo` envolve o helper/instalador. `K3S` pode indicar outro caminho executável
+nos testes, sem `eval` ou divisão de uma string de comando.
 Assim ambos usam o mesmo acesso root do K3s, sem copiar ou imprimir kubeconfig.
 
 ## Secret e instalação — EC2 VIA SSM
@@ -157,7 +170,7 @@ Kubernetes depende das proteções de RBAC/criptografia já configuradas no K3s.
 Instale (a mesma operação pode ser repetida):
 
 ```bash
-sudo env KUBECTL="$KUBECTL" EXPECTED_API_PODS=auto \
+sudo env KUBECTL="$KUBECTL" EXPECTED_API_PODS=3 \
   bash scripts/staging/observability/install.sh install
 ```
 
@@ -166,20 +179,27 @@ somente a stack, salva snapshot sem Secrets em `/var/lib/oficina-observability`,
 valida com server-side dry-run e aplica com field manager próprio. Aguarda os dois
 rollouts e consulta `/api/v1/targets` por port-forward temporário em loopback.
 
-`EXPECTED_API_PODS` continua disponível. O padrão `auto` lê `spec.replicas` do
-Deployment `oficina-api`, controlado pelo HPA, **sem alterar réplicas nem HPA**.
-Um inteiro positivo exige também que esse valor corresponda ao desejado pelo
-Deployment; não use uma contagem menor para contornar pods/targets ausentes.
+`EXPECTED_API_PODS=3` é o padrão e o valor para a amostra atual. Exige também que
+esse valor corresponda ao desejado pelo Deployment; não use uma contagem menor
+para contornar pods/targets ausentes. O modo opcional `auto` permanece compatível
+com os testes, mas não é usado neste procedimento. Nenhum modo altera réplicas/HPA.
 O Deployment precisa estar convergido (geração observada, todas as réplicas
 atualizadas, Ready e disponíveis). Zero pods/targets nunca é sucesso.
+
+Antes de qualquer `apply` (inclusive dry-run), o instalador exige duas amostras
+da API com os mesmos nomes, UIDs, IPs, geração do Deployment e contadores de
+reinício, separadas por 15s. Se a API não estabilizar em três pods, interrompe
+sem aplicar nem remover recursos da stack. O Secret criado separadamente permanece.
+Não é preciso ter Prometheus instalado para esse preflight.
 
 O aceite exige correspondência exata entre pods Running/Ready não terminando e
 targets UP: nomes, IPs distintos, namespace, intervalo 15s e URLs individuais
 `http://<IP>:8080/actuator/prometheus`. Lê Deployment/pods antes e depois da consulta
-e exige duas amostras válidas com as mesmas identidades (UID/IP), separadas por
+e exige duas amostras válidas com as mesmas identidades e contadores de reinício, separadas por
 15s. Scaling/rollout ou falha reinicia a estabilidade; o HPA permanece livre.
-São até 24 tentativas (pausa 5s em falhas, 15s entre amostras válidas), além dos
-rollouts de até cinco minutos cada. Se não estabilizar, falha e faz rollback;
+São até 24 tentativas em cada verificação (pausa 5s em falhas, 15s entre amostras
+válidas), além dos rollouts de até cinco minutos cada. Falhas após o início da
+aplicação acionam rollback;
 investigue API/HPA/targets e repita depois, sem reduzir o esperado para forçar aceite.
 O bloqueio `flock` impede instalações simultâneas.
 
@@ -196,7 +216,7 @@ O caminho do snapshot aparece antes da aplicação. Para reverter manualmente a
 
 ```bash
 cd "$REVIEW_DIR"
-sudo env KUBECTL="$KUBECTL" EXPECTED_API_PODS=auto \
+sudo env KUBECTL="$KUBECTL" EXPECTED_API_PODS=3 \
   bash scripts/staging/observability/install.sh rollback \
   '/var/lib/oficina-observability/attempt.<identificador-impresso>'
 ```
@@ -218,10 +238,10 @@ pelo túnel com dashboard/datasource provisionados. Não foi executado nesta rev
 se abrir outra sessão), confira os rollouts e deixe o port-forward rodando:
 
 ```bash
-sudo k3s kubectl -n oficina-staging rollout status deployment/oficina-api --timeout=300s
-sudo k3s kubectl -n oficina-staging rollout status deployment/oficina-observability-prometheus --timeout=300s
-sudo k3s kubectl -n oficina-staging rollout status deployment/oficina-observability-grafana --timeout=300s
-sudo k3s kubectl -n oficina-staging port-forward --address 127.0.0.1 \
+sudo /usr/local/bin/k3s kubectl -n oficina-staging rollout status deployment/oficina-api --timeout=300s
+sudo /usr/local/bin/k3s kubectl -n oficina-staging rollout status deployment/oficina-observability-prometheus --timeout=300s
+sudo /usr/local/bin/k3s kubectl -n oficina-staging rollout status deployment/oficina-observability-grafana --timeout=300s
+sudo /usr/local/bin/k3s kubectl -n oficina-staging port-forward --address 127.0.0.1 \
   service/oficina-observability-grafana 13000:3000
 ```
 
@@ -261,8 +281,9 @@ O workflow `observability-validate.yml` repete essas verificações em PRs relev
 Os testes simulados não substituem o aceite runtime de PVC, agendamento, discovery,
 RBAC e targets reais, realizado pelo instalador somente na futura instalação.
 
-Validação desta revisão: 23 testes aprovados, incluindo wrapper K3s no instalador
-e helper de Secret, HPA com 1–3 pods, rejeição de amostras instáveis e de override
+Validação desta revisão: 25 testes aprovados, incluindo preflight antes de apply,
+padrão de três pods, wrapper K3s no instalador e helper de Secret, compatibilidade
+do modo auto com 1–3 pods, rejeição de amostras instáveis/reinícios e de override
 que ocultaria ausência; 11 recursos válidos no kubeconform, zero inválidos/erros/
 ignorados; configuração Prometheus e 10 expressões PromQL aprovadas pelo promtool;
 Bash/ShellCheck aprovados. Execução local com kubectl 1.35.10 (schemas 1.34.0),

@@ -4,7 +4,7 @@ import json
 import sys
 
 
-def validate(pods, response, expected=3):
+def ready_pods(pods, expected):
     ready = {
         p['metadata']['name']: p['status']['podIP']
         for p in pods['items']
@@ -15,6 +15,11 @@ def validate(pods, response, expected=3):
     }
     if expected < 1 or len(ready) != expected or len(set(ready.values())) != expected:
         raise ValueError(f'Esperados {expected} pods Ready com IPs distintos; encontrados {len(ready)}')
+    return ready
+
+
+def validate(pods, response, expected=3):
+    ready = ready_pods(pods, expected)
     if response.get('status') != 'success':
         raise ValueError('Consulta de targets falhou')
     targets = [t for t in response['data']['activeTargets']
@@ -36,7 +41,7 @@ def validate(pods, response, expected=3):
     return observed
 
 
-def stable_sample(pods, response, expected, deployment, after, deployment_after):
+def api_sample(pods, expected, deployment, after, deployment_after):
     """Use desired replicas, never the observed target count, as the acceptance floor."""
     def deployment_state(obj):
         meta, spec, status = obj['metadata'], obj['spec'], obj['status']
@@ -53,21 +58,38 @@ def stable_sample(pods, response, expected, deployment, after, deployment_after)
     count = state[2] if expected == 'auto' else int(expected)
     if count != state[2]:
         raise ValueError('EXPECTED_API_PODS difere das réplicas desejadas pelo Deployment/HPA')
-    names = validate(pods, response, count)
-    validate(after, response, count)
+    names = ready_pods(pods, count)
+    if names != ready_pods(after, count):
+        raise ValueError('Pods mudaram durante a amostra')
 
     def identities(items):
-        return sorted((p['metadata']['name'], p['metadata']['uid'], p['status']['podIP'])
+        return sorted((p['metadata']['name'], p['metadata']['uid'], p['status']['podIP'],
+                       sorted((c['name'], c['restartCount'])
+                              for c in p['status'].get('containerStatuses', [])))
                       for p in items['items'] if p['metadata']['name'] in names)
 
     if identities(pods) != identities(after):
         raise ValueError('Pods mudaram durante a amostra')
-    return 'Targets UP individuais (15s), amostra estável: ' + json.dumps(
-        {'deployment': state, 'pods': identities(pods)}, sort_keys=True)
+    return {'deployment': state, 'pods': identities(pods)}
+
+
+def stable_sample(pods, response, expected, deployment, after, deployment_after):
+    sample = api_sample(pods, expected, deployment, after, deployment_after)
+    count = sample['deployment'][2]
+    validate(pods, response, count)
+    validate(after, response, count)
+    return 'Targets UP individuais (15s), amostra estável: ' + json.dumps(sample, sort_keys=True)
 
 
 if __name__ == '__main__':
     try:
+        if sys.argv[1] == '--api-only':
+            def read(path):
+                with open(path) as f:
+                    return json.load(f)
+            print(json.dumps(api_sample(read(sys.argv[2]), sys.argv[3], read(sys.argv[4]),
+                                        read(sys.argv[5]), read(sys.argv[6])), sort_keys=True))
+            sys.exit(0)
         with open(sys.argv[1]) as f:
             pods = json.load(f)
         with open(sys.argv[2]) as f:

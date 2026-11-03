@@ -21,7 +21,8 @@ spec.loader.exec_module(targets)
 
 def fixtures():
     pods = {'items': [{'metadata': {'name': f'api-{i}', 'uid': f'uid-{i}'}, 'status': {'phase': 'Running',
-            'podIP': f'10.42.0.{i}', 'conditions': [{'type': 'Ready', 'status': 'True'}]}}
+            'podIP': f'10.42.0.{i}', 'conditions': [{'type': 'Ready', 'status': 'True'}],
+            'containerStatuses': [{'name': 'api', 'restartCount': 0}]}}
             for i in range(1, 4)]}
     response = {'status': 'success', 'data': {'activeTargets': [
         {'labels': {'job': 'oficina-api', 'namespace': 'oficina-staging', 'pod': f'api-{i}'},
@@ -71,7 +72,7 @@ class TargetTests(unittest.TestCase):
                 pods, response, 'auto', deployment, pods, deployment))
 
     def test_changing_or_incomplete_samples_fail(self):
-        for mode in ('generation', 'replicas', 'uid', 'unready', 'override', 'empty', 'missing-target'):
+        for mode in ('generation', 'replicas', 'uid', 'restart', 'unready', 'override', 'empty', 'missing-target'):
             with self.subTest(mode=mode):
                 pods, response = fixtures()
                 deployment = deployment_fixture()
@@ -80,6 +81,7 @@ class TargetTests(unittest.TestCase):
                 if mode == 'generation': deployment_after['metadata']['generation'] += 1
                 if mode == 'replicas': deployment_after = deployment_fixture(2)
                 if mode == 'uid': after['items'][0]['metadata']['uid'] = 'replacement'
+                if mode == 'restart': after['items'][0]['status']['containerStatuses'][0]['restartCount'] = 1
                 if mode == 'unready': deployment['status']['readyReplicas'] = 2
                 if mode == 'override': expected = '2'
                 if mode == 'empty':
@@ -170,7 +172,8 @@ if args[0]=='get':
   pods=json.loads((p/'pods.json').read_text())
   counter=p/'pod-reads'; reads=int(counter.read_text()) if counter.exists() else 0
   counter.write_text(str(reads+1))
-  if mode=='churn': pods['items'][0]['metadata']['uid']=str(reads//2)
+  if mode=='preflight-churn' or (mode=='churn' and state):
+   pods['items'][0]['metadata']['uid']=str(reads//2)
   print(json.dumps(pods))
  elif '-o' in args and args[args.index('-o')+1]=='json': print(json.dumps({'apiVersion':'v1','kind':'List','items':state}))
  else: print('exists')
@@ -206,6 +209,7 @@ class InstallerTests(unittest.TestCase):
         self.path = Path(self.temp.name)
         self.env = dict(os.environ, FAKE_DIR=str(self.path), STATE_DIR=str(self.path/'state'),
                         KUBECTL=str(self.path/'kubectl'), PATH=str(self.path)+':'+os.environ['PATH'])
+        self.env.pop('EXPECTED_API_PODS', None)
         (self.path/'kubectl').write_text(MOCK)
         (self.path/'curl').write_text('#!/bin/sh\ncat "$FAKE_DIR/targets.json"\n')
         (self.path/'sleep').write_text('#!/bin/sh\n/usr/bin/sleep 0.02\n')
@@ -225,6 +229,10 @@ class InstallerTests(unittest.TestCase):
 
     def test_success_and_idempotence(self):
         first = self.run_install(); self.assertEqual(first.returncode, 0, first.stderr)
+        calls = [json.loads(line) for line in (self.path/'calls').read_text().splitlines()]
+        first_apply = next(i for i, call in enumerate(calls) if 'apply' in call)
+        self.assertGreaterEqual(sum('pods' in c for c in calls[:first_apply]), 4)
+        self.assertIn('Preflight API estável', first.stdout)
         before = self.inventory()
         second = self.run_install(); self.assertEqual(second.returncode, 0, second.stderr)
         self.assertEqual(self.inventory(), before)
@@ -233,6 +241,8 @@ class InstallerTests(unittest.TestCase):
         (self.path/'k3s').write_text('#!/bin/bash\n[[ "$1" == kubectl ]] || exit 1\nshift\nexec "$FAKE_DIR/kubectl" "$@"\n')
         (self.path/'k3s').chmod(0o755)
         self.env['KUBECTL'] = str(HERE/'k3s-kubectl.sh')
+        self.env['K3S'] = str(self.path/'k3s')
+        self.env['EXPECTED_API_PODS'] = 'auto'
         for count in (1, 2, 3):
             with self.subTest(count=count):
                 pods, response = fixtures()
@@ -257,7 +267,27 @@ class InstallerTests(unittest.TestCase):
         (self.path/'targets.json').write_text(json.dumps(response))
         result = self.run_install()
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual([x['kind'] for x in self.inventory()], ['PersistentVolumeClaim'])
+        self.assertEqual(self.inventory(), [])
+
+    def test_unstable_api_never_reaches_apply(self):
+        result = self.run_install('preflight-churn')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.inventory(), [])
+        calls = [json.loads(line) for line in (self.path/'calls').read_text().splitlines()]
+        self.assertFalse(any('apply' in call or 'delete' in call for call in calls))
+        self.assertIn('nenhum recurso da stack foi aplicado', result.stderr)
+
+    def test_current_sample_keeps_three_expected(self):
+        pods, response = fixtures()
+        pods['items'] = pods['items'][:2]
+        response['data']['activeTargets'] = response['data']['activeTargets'][:2]
+        (self.path/'pods.json').write_text(json.dumps(pods))
+        (self.path/'targets.json').write_text(json.dumps(response))
+        (self.path/'deployment.json').write_text(json.dumps(deployment_fixture(2)))
+        result = self.run_install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.inventory(), [])
+        self.assertIn('EXPECTED_API_PODS difere', result.stderr)
 
     def test_preflight_failures_do_not_mutate(self):
         for mode in ['secret', 'dry-run']:
@@ -321,14 +351,14 @@ class InstallerTests(unittest.TestCase):
 class SecretTests(unittest.TestCase):
     def test_k3s_wrapper_passes_stdin_and_arguments(self):
         with tempfile.TemporaryDirectory() as directory:
-            k3s = Path(directory)/'k3s'
+            k3s = Path(directory)/'k3s executable'
             # Check internally; never echo the Secret, even with synthetic credentials.
             k3s.write_text('#!/usr/bin/env python3\nimport json,sys\n'
                             'assert sys.argv[1:] == ["kubectl", "create", "-f", "-"]\n'
                             'assert json.load(sys.stdin)["kind"] == "Secret"\n')
             k3s.chmod(0o755)
             with patch.dict(os.environ, KUBECTL=str(HERE/'k3s-kubectl.sh'),
-                            PATH=directory+':'+os.environ['PATH']), \
+                            K3S=str(k3s)), \
                     patch('getpass.getpass', return_value='synthetic-Only-Test-123456!'):
                 runpy.run_path(str(HERE/'create-admin-secret.py'), run_name='__main__')
 
