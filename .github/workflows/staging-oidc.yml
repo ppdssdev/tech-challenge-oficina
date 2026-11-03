@@ -1,0 +1,29 @@
+name: Validate staging OIDC
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  identity:
+    if: github.ref == 'refs/heads/main' && github.repository == 'ppdssdev/tech-challenge-oficina'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::797781632267:role/oficina-staging-github-app
+          aws-region: us-east-2
+          allowed-account-ids: '797781632267'
+          role-session-name: github-${{ github.run_id }}-${{ github.run_attempt }}
+          role-duration-seconds: 900
+          unset-current-credentials: true
+      - name: Verify expected identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws sts get-caller-identity > identity.json
+          cat identity.json
+          jq -e '.Account == "797781632267" and (.Arn | startswith("arn:aws:sts::797781632267:assumed-role/oficina-staging-github-app/"))' identity.json
