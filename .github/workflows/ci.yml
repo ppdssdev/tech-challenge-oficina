@@ -102,9 +102,18 @@ jobs:
       - name: Render Kubernetes manifests
         run: |
           for overlay in local staging; do
-            kubectl kustomize "k8s/$overlay" > "/tmp/oficina-k8s-$overlay.yaml"
+            if [ "$overlay" = staging ]; then
+              bash scripts/staging/render.sh "example.invalid/oficina@sha256:$(printf '%064d' 0)" > "/tmp/oficina-k8s-$overlay.yaml"
+            else
+              kubectl kustomize "k8s/$overlay" > "/tmp/oficina-k8s-$overlay.yaml"
+            fi
             test -s "/tmp/oficina-k8s-$overlay.yaml"
           done
+
+      - name: Test staging configuration guards
+        run: |
+          python3 -m pip install PyYAML==6.0.2
+          python3 scripts/staging/test-render.py
 
       - name: Validate Kubernetes schemas offline from cluster
         run: |

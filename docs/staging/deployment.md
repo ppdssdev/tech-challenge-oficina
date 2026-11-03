@@ -147,16 +147,18 @@ repair, clean ou retry cego. Há parallelism/completions=1, backoffLimit=0 e pra
 600 segundos. Flyway ainda usa seu bloqueio no banco para concorrência acidental.
 Serializar releases no processo de entrega; o runtime nunca migra ao escalar.
 
-Depois do primeiro Job e dos grants, iniciar uma réplica da API (manifest padrão).
+No bootstrap inicial, depois do primeiro Job e dos grants, iniciar uma réplica da API antes de habilitar o HPA. No staging já inicializado, o HPA controla as réplicas; o Deployment não fixa replicas.
 Após seed ADMIN e readiness bem-sucedidos, pode-se escalar. Isso evita concorrência
 na criação inicial da conta administrativa pelo bootstrap existente. Recolher
 resultado/logs do Job sem segredos e remover a credencial de migration do namespace
 quando fora da janela de release. Não montar esse Secret na API.
 
-Kustomize usa imagem placeholder `oficina-api:staging-review-required` para impedir
-implantação inadvertida. Substituir por imagem publicada e digest revisado, tanto
-no Job quanto no overlay do Deployment. Configurar imagePullSecret se necessário,
-sem embutir credenciais de registry.
+O overlay direto falha por ausência intencional de `image-digest.yaml`. Use
+`bash scripts/staging/render.sh "$IMAGE"` para produzir YAML com digest obrigatório.
+O script não consulta o cluster nem aplica recursos. Veja o
+[runbook de consolidação](consolidation.md) para validação e rollback.
+O Job permanece separado e exige substituição manual de seu placeholder pelo mesmo
+digest revisado antes de qualquer execução de migration.
 
 ## Injeção de configuração e segredos
 

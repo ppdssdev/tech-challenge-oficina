@@ -3,8 +3,6 @@ kind: Deployment
 metadata:
   name: oficina-api
 spec:
-  # First startup seeds the administrative account; scale after it is ready.
-  replicas: 1
   selector:
     matchLabels:
       app: oficina-api
@@ -21,7 +19,6 @@ spec:
         fsGroup: 1000
       containers:
         - name: api
-          image: oficina-api:staging-review-required
           ports:
             - name: http
               containerPort: 8080

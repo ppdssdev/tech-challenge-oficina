@@ -4,8 +4,8 @@ namespace: oficina-staging
 resources:
   - namespace.yaml
   - api.yaml
+  - hpa.yaml
 # The migration Job is deliberately applied and awaited separately before this Deployment.
-images:
-  - name: oficina-api
-    newName: oficina-api
-    newTag: staging-review-required
+  # A missing patch deliberately blocks direct application without a reviewed digest.
+patches:
+  - path: image-digest.yaml
