@@ -1,0 +1,44 @@
+# Single process, private receiver; no metrics-generator or external backend.
+multitenancy_enabled: false
+server:
+  http_listen_port: 3200
+  grpc_listen_address: 127.0.0.1
+usage_report:
+  reporting_enabled: false
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        http:
+          endpoint: 0.0.0.0:4318
+ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+  max_block_duration: 5m
+  max_block_bytes: 16777216
+compactor:
+  compaction:
+    block_retention: 24h
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+querier:
+  max_concurrent_queries: 2
+query_frontend:
+  search:
+    concurrent_jobs: 2
+overrides:
+  defaults:
+    ingestion:
+      rate_limit_bytes: 65536
+      burst_size_bytes: 131072
+      max_traces_per_user: 1000
+    global:
+      max_bytes_per_trace: 1048576

@@ -9,3 +9,13 @@ datasources:
   editable: false
   jsonData:
     timeInterval: 15s
+- name: Tempo
+  uid: tempo
+  type: tempo
+  access: proxy
+  url: http://oficina-tempo:3200
+  editable: false
+  jsonData:
+    httpMethod: GET
+    nodeGraph:
+      enabled: false

@@ -8,18 +8,16 @@ KUBECTL=${KUBECTL:-kubectl}
 STATE_DIR=${STATE_DIR:-/var/lib/oficina-observability}
 EXPECTED_API_PODS=${EXPECTED_API_PODS:-3}
 NS=oficina-staging
-OWNER='app.kubernetes.io/part-of=oficina-observability'
-KINDS=deployments,services,configmaps,serviceaccounts,roles,rolebindings,persistentvolumeclaims
 PF_PID=''
 ATTEMPT=''
 MUTATING=false
 k() { "$KUBECTL" -n "$NS" "$@"; }
 cleanup() { if [[ -n "$PF_PID" ]]; then kill "$PF_PID" 2>/dev/null || true; wait "$PF_PID" 2>/dev/null || true; PF_PID=''; fi; }
 trap cleanup EXIT
-usage() { echo "Uso: $0 install | rollback /var/lib/oficina-observability/attempt.XXXXXX" >&2; exit 2; }
+usage() { echo "Uso: $0 install | upgrade | rollback /var/lib/oficina-observability/attempt.XXXXXX" >&2; exit 2; }
 [[ $# -ge 1 ]] || usage
 MODE=$1
-[[ "$MODE" == install && $# == 1 || "$MODE" == rollback && $# == 2 ]] || usage
+[[ ( "$MODE" == install || "$MODE" == upgrade ) && $# == 1 || "$MODE" == rollback && $# == 2 ]] || usage
 [[ "$EXPECTED_API_PODS" == auto || "$EXPECTED_API_PODS" =~ ^[1-9][0-9]*$ ]] || usage
 for tool in "$KUBECTL" python3 curl flock; do command -v "$tool" >/dev/null; done
 mkdir -p "$STATE_DIR"
@@ -99,7 +97,9 @@ rollback() {
     local attempt=$1
     [[ -f "$attempt/before.json" && -f "$attempt/attempted" ]] || { echo 'Snapshot inválido.' >&2; return 1; }
     cleanup
-    k get "$KINDS" -l "$OWNER" -o json >"$attempt/current.json" || return 1
+    # Only inspect names touched by this attempt, never the entire owner inventory.
+    k get -f "$attempt/desired.yaml" --ignore-not-found -o json >"$attempt/current.raw.json" || return 1
+    python3 "$ROOT/scripts/staging/observability/resource-list.py" "$attempt/current.raw.json" >"$attempt/current.json" || return 1
     # Preserve PVCs even after a failed first installation. No Secret is in this inventory.
     python3 - "$attempt" <<'PY' || return 1
 import json, pathlib, sys
@@ -152,18 +152,22 @@ trap 'on_error 143' TERM
 k get namespace "$NS" >/dev/null
 k get secret oficina-observability-grafana-admin -o name >/dev/null
 "$KUBECTL" get storageclass local-path >/dev/null
+OVERLAY="$ROOT/k8s/staging/observability"
+if [[ "$MODE" == upgrade ]]; then
+    # Require the installed stack; never bootstrap it or recreate its Secret/PVC.
+    k get deployment oficina-observability-prometheus >/dev/null
+    k get deployment oficina-observability-grafana >/dev/null
+    python3 -c 'import yaml' # Required only for the incremental manifest selection.
+fi
 ATTEMPT=$(mktemp -d "$STATE_DIR/attempt.XXXXXX")
-"$KUBECTL" kustomize "$ROOT/k8s/staging/observability" >"$ATTEMPT/desired.yaml"
+"$KUBECTL" kustomize "$OVERLAY" >"$ATTEMPT/rendered.yaml"
+if [[ "$MODE" == upgrade ]]; then
+    python3 "$ROOT/scripts/staging/observability/upgrade-manifest.py" <"$ATTEMPT/rendered.yaml" >"$ATTEMPT/desired.yaml"
+else
+    cp "$ATTEMPT/rendered.yaml" "$ATTEMPT/desired.yaml"
+fi
 k get -f "$ATTEMPT/desired.yaml" --ignore-not-found -o json >"$ATTEMPT/collisions.json"
-python3 - "$ATTEMPT/collisions.json" <<'PY2'
-import json,sys
-obj=json.load(open(sys.argv[1]))
-items=obj.get('items',[]) if obj.get('kind')=='List' else [obj]
-for item in items:
-    if item['metadata'].get('labels',{}).get('app.kubernetes.io/part-of')!='oficina-observability':
-        sys.exit('Nome já utilizado por recurso não gerenciado: '+item['metadata']['name'])
-PY2
-k get "$KINDS" -l "$OWNER" -o json >"$ATTEMPT/before.raw.json"
+python3 "$ROOT/scripts/staging/observability/resource-list.py" "$ATTEMPT/collisions.json" >"$ATTEMPT/before.raw.json"
 python3 - "$ATTEMPT" <<'PY'
 import json,pathlib,sys
 p=pathlib.Path(sys.argv[1]); data=json.loads((p/'before.raw.json').read_text())
@@ -181,6 +185,7 @@ MUTATING=true
 touch "$ATTEMPT/attempted"
 k apply --server-side --field-manager=oficina-observability -f "$ATTEMPT/desired.yaml"
 rollouts
+k rollout status deployment/oficina-observability-tempo --timeout=300s
 check_targets "$ATTEMPT"
 MUTATING=false
 touch "$ATTEMPT/succeeded"
