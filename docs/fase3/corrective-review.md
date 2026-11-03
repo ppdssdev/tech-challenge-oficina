@@ -1,3 +1,6 @@
+> **Registro histórico:** resultados e pendências abaixo pertencem à etapa original.
+> Estado vigente em 2026-11-03: [consolidação auditada](README.md).
+
 # Revisão corretiva consolidada — bootstrap Fase 3
 
 Revisão de 2026-10-31, nas quatro PRs existentes. **Bootstrap revisável não equivale

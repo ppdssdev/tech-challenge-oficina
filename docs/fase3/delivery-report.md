@@ -1,3 +1,6 @@
+> **Registro histórico:** resultados e pendências abaixo pertencem à etapa original.
+> Estado vigente em 2026-11-03: [consolidação auditada](README.md).
+
 # Relatório de entrega — PR 3
 
 Data: 2026-10-31. Bootstrap real de quatro repositórios; nenhum acesso à conta AWS,

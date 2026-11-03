@@ -1,3 +1,6 @@
+> **Registro histórico:** resultados e pendências abaixo pertencem à etapa original.
+> Estado vigente em 2026-11-03: [consolidação auditada](README.md).
+
 # Reconciliação da Fase 3
 
 Base inspecionada: `origin/main` e `HEAD` em

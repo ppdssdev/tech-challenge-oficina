@@ -1,3 +1,6 @@
+> **Registro histórico:** resultados e pendências abaixo pertencem à etapa original.
+> Estado vigente em 2026-11-03: [consolidação auditada](README.md).
+
 # Dependências AWS, state e custos
 
 Região proposta: us-east-2. Nenhuma chamada à conta AWS, plan, apply, destroy,

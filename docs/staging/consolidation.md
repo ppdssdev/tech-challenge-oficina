@@ -1,3 +1,6 @@
+> **Registro histórico:** resultados e pendências abaixo pertencem à etapa original.
+> Estado vigente em 2026-11-03: [consolidação auditada](../fase3/README.md).
+
 # Consolidação de staging — Fase 3
 
 Base auditada: main `7b4779052b2d3fde9e79042b96c41c047f4deb9b`.
