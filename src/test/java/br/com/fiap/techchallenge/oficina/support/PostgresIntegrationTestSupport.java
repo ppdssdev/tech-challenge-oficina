@@ -1,6 +1,7 @@
 package br.com.fiap.techchallenge.oficina.support;
 
 import br.com.fiap.techchallenge.oficina.OficinaApplication;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -8,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 @SpringBootTest(
@@ -29,6 +31,11 @@ public abstract class PostgresIntegrationTestSupport {
 
     @Autowired
     protected JdbcTemplate jdbcTemplate;
+
+    // Cached Spring contexts share this database. Background aggregate reads can
+    // deadlock with the next test's TRUNCATE; metrics tests drive collection explicitly.
+    @MockitoBean(name = "businessMetricsScheduler")
+    protected ThreadPoolTaskScheduler businessMetricsScheduler;
 
     @DynamicPropertySource
     static void configurePostgres(DynamicPropertyRegistry registry) {
