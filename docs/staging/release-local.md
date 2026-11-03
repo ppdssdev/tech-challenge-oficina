@@ -112,7 +112,7 @@ export IMAGE='797781632267.dkr.ecr.us-east-2.amazonaws.com/oficina-staging-api@s
 python3 - <<'PY'
 import json, os, re
 image = os.environ['IMAGE']
-assert re.fullmatch(r'797781632267\.dkr\.ecr\.us-east-2\.amazonaws\.com/oficina-staging-api@sha256:[a-f0-9]{64}', image)
+if not re.fullmatch(r'797781632267\.dkr\.ecr\.us-east-2\.amazonaws\.com/oficina-staging-api@sha256:[a-f0-9]{64}', image): raise SystemExit('Digest inválido')
 k = 'sudo k3s kubectl -n oficina-staging '
 commands = ['set -eu', k+'set image deployment/oficina-api api='+image,
  k+'rollout status deployment/oficina-api --timeout=300s',

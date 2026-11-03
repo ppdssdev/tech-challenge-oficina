@@ -33,10 +33,10 @@ region=$(aws_local configure get region)
 aws_local configure export-credentials --format process | python3 -c '
 import json,sys,datetime
 c=json.load(sys.stdin)
-assert c.get("SessionToken"), "Credenciais temporárias obrigatórias"
+if not c.get("SessionToken"): sys.exit("Credenciais temporárias obrigatórias")
 e=c.get("Expiration")
-assert e, "Expiração obrigatória"
-assert datetime.datetime.fromisoformat(e.replace("Z","+00:00")) > datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(minutes=30), "Sessão curta demais"
+if not e: sys.exit("Expiração obrigatória")
+if datetime.datetime.fromisoformat(e.replace("Z","+00:00")) <= datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(minutes=30): sys.exit("Sessão curta demais")
 ' || fail 'Renove as credenciais temporárias do perfil'
 account=$(aws_local sts get-caller-identity --query Account --output text)
 [[ $account == 797781632267 ]] || fail 'Conta AWS divergente'

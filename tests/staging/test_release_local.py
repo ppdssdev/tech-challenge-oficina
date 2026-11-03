@@ -1,4 +1,5 @@
 import os
+import pty
 from pathlib import Path
 import subprocess
 import tempfile
@@ -7,7 +8,7 @@ import unittest
 SCRIPT = Path(__file__).resolve().parents[2] / 'scripts/staging/release-local.sh'
 
 class ReleaseTests(unittest.TestCase):
-    def run_case(self, mode='--execute', account='797781632267', region='us-east-2', mutable='IMMUTABLE', online='Online', dirty='', ambient='us-east-2'):
+    def run_case(self, mode='--execute', account='797781632267', region='us-east-2', mutable='IMMUTABLE', online='Online', dirty='', ambient='us-east-2', terminal=False):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp)
             mock = '''#!/usr/bin/env python3
@@ -39,9 +40,19 @@ elif name=='docker' and a!=['info']: sys.exit(99)
                 file.write_text(mock)
                 file.chmod(0o755)
             env = dict(os.environ, PATH=tmp+':'+os.environ['PATH'], ROOT=tmp, CALLS=str(p/'calls'), ACCOUNT=account, REGION=region, MUTABLE=mutable, ONLINE=online, DIRTY=dirty, AWS_REGION=ambient, AWS_DEFAULT_REGION=ambient)
-            result = subprocess.run(['bash', str(SCRIPT), mode], env=env, text=True, capture_output=True)
+            args = ['bash', str(SCRIPT)] + ([] if mode is None else [mode])
+            if terminal:
+                master, slave = pty.openpty()
+                try:
+                    os.write(master, b'CANCELAR\n')
+                    result = subprocess.run(args, stdin=slave, env=env, text=True, capture_output=True, timeout=10)
+                finally:
+                    os.close(master)
+                    os.close(slave)
+            else:
+                result = subprocess.run(args, env=env, text=True, capture_output=True, timeout=10)
             calls = (p/'calls').read_text() if (p/'calls').exists() else ''
-            self.assertEqual(result.returncode, 0 if mode == '--dry-run' else 1)
+            self.assertEqual(result.returncode, 0 if mode in (None, '--dry-run') else 1)
             for forbidden in ('send-command', 'push', 'login', 'build', 'put-', 'apply'):
                 self.assertNotIn(forbidden, calls)
             return result.stdout+result.stderr, calls
@@ -51,6 +62,15 @@ elif name=='docker' and a!=['info']: sys.exit(99)
         self.assertIn('git-'+'a'*40, output)
         self.assertNotIn('aws ', calls)
         self.assertNotIn('docker ', calls)
+
+    def test_default_is_offline(self):
+        _, calls = self.run_case(None)
+        self.assertNotIn('aws ', calls)
+        self.assertNotIn('docker ', calls)
+
+    def test_declined_confirmation(self):
+        output, _ = self.run_case(terminal=True)
+        self.assertIn('Operação cancelada', output)
 
     def test_execute_requires_terminal(self):
         output, _ = self.run_case()
