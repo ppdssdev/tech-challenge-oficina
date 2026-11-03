@@ -1,6 +1,6 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
-    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+    <include resource="org/springframework/boot/logging/logback/structured-console-appender.xml"/>
     <!-- Dedicated diagnostic sink: no console propagation, no raw Throwable. -->
     <appender name="DIAGNOSTICS" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${DIAGNOSTICS_DIR:-logs/restricted}/errors.log</file>
@@ -10,7 +10,9 @@
             <maxHistory>7</maxHistory>
             <totalSizeCap>100MB</totalSizeCap>
         </rollingPolicy>
-        <encoder><pattern>%d{ISO8601} %msg%n%nopex</pattern></encoder>
+        <encoder class="org.springframework.boot.logging.logback.StructuredLogEncoder">
+            <format>logstash</format>
+        </encoder>
     </appender>
     <logger name="oficina.restricted.diagnostics" level="ERROR" additivity="false">
         <appender-ref ref="DIAGNOSTICS"/>

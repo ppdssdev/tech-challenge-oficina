@@ -13,7 +13,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
+import io.micrometer.tracing.Tracer;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +36,12 @@ public class ApiExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
     private static final Logger diagnostics = LoggerFactory.getLogger("oficina.restricted.diagnostics");
+
+    private final Tracer tracer;
+
+    public ApiExceptionHandler(Tracer tracer) {
+        this.tracer = tracer;
+    }
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(NotFoundException ex, HttpServletRequest request) {
@@ -234,14 +240,8 @@ public class ApiExceptionHandler {
     }
 
     private String traceId(HttpServletRequest request) {
-        String correlationId = request.getHeader("X-Correlation-Id");
-
-        if (correlationId != null && correlationId.matches("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}")
-            && !correlationId.matches(".*[0-9]{11,}.*")) {
-            return correlationId;
-        }
-
-        return UUID.randomUUID().toString();
+        var span = tracer.currentSpan();
+        return span == null ? null : span.context().traceId();
     }
 
     private Throwable rootCause(Throwable throwable) {
