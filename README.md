@@ -1,1028 +1,208 @@
-# Oficina Tech Challenge API
+# Oficina · Tech Challenge
 
-MVP de back-end para uma oficina mecânica de médio porte, com foco em gestão de clientes, veículos, serviços, peças/insumos, estoque e ordens de serviço.
+**Gestão de oficinas mecânicas, da abertura da ordem de serviço à entrega do veículo.**
 
-O projeto foi construído como **monólito Spring Boot com arquitetura hexagonal**, usando **DDD pragmático** para concentrar as principais regras no domínio, principalmente no agregado `WorkOrder`.
+API REST desenvolvida em **Java 21 e Spring Boot**, com arquitetura hexagonal, regras de negócio orientadas ao domínio e infraestrutura provisionada na **AWS com Terraform**. A solução reúne clientes, veículos, orçamento, estoque e acompanhamento de serviços em uma operação rastreável, com autenticação JWT e observabilidade.
 
----
+O ambiente de homologação combina **Kubernetes com K3s em EC2**, **Amazon RDS PostgreSQL**, **Amazon ECR** e autenticação de clientes com **AWS Lambda**. A administração acontece pelo **AWS Systems Manager (SSM)**, e a entrega utiliza imagens identificadas por digest.
 
-## Arquitetura proposta
+[Arquitetura AWS](#arquitetura-na-aws) · [Provisionamento](#provisionamento-e-entrega) · [Execução local](#execução-local) · [Demonstração da API](#demonstração-da-api) · [Documentação](#documentação)
 
-A arquitetura do projeto está documentada nos desenhos abaixo, contemplando os componentes da aplicação, a infraestrutura provisionada e o fluxo de deploy e execução.
+## O que a solução entrega
 
-### Componentes da aplicação
+| Capacidade | Aplicação no dia a dia da oficina |
+| --- | --- |
+| Clientes e veículos | Cadastro, validação de CPF/CNPJ e placa, vínculo de propriedade e ativação/inativação de clientes. |
+| Ordens de serviço | Abertura, diagnóstico, orçamento, aprovação ou recusa, execução, finalização e entrega. |
+| Serviços e peças | Catálogo de serviços, composição de orçamento e valores preservados nos itens da OS. |
+| Estoque consistente | Baixa na aprovação, validação de disponibilidade e proteção contra atualizações concorrentes. |
+| Acompanhamento | Consulta autenticada pelo proprietário e histórico persistido das mudanças de status. |
+| Notificações | Outbox transacional, processamento concorrente com retries e demonstração de e-mail com Mailpit no ambiente local. |
+| Operação observável | Métricas técnicas e de negócio, dashboards, logs estruturados e integração de tracing. |
 
-A aplicação foi estruturada como um monólito modular com arquitetura hexagonal e DDD pragmático. Os adaptadores de entrada expõem os endpoints REST, a camada de aplicação orquestra os casos de uso, o domínio concentra as regras de negócio e os adaptadores de saída integram persistência, notificações e observabilidade.
+## Arquitetura na AWS
 
-![Arquitetura da Aplicação](docs/images/arquitetura-aplicacao.png)
+![Arquitetura AWS da Oficina: EC2 com K3s, RDS privado, autenticação Lambda e serviços de operação](docs/images/oficina-arquitetura-aws.svg)
 
-### Infraestrutura provisionada
+*A visão representa a topologia de staging e os componentes definidos nos repositórios. As conexões e os controles de acesso estão identificados no desenho; o SVG pode ser aberto para visualizar os detalhes.*
 
-O ambiente local reproduzível utiliza Docker, Kind/Kubernetes, Terraform, PostgreSQL, Mailpit, Prometheus, Grafana, Metrics Server e HPA. A infraestrutura permite demonstrar execução local, observabilidade, configuração por ConfigMap/Secret e escalabilidade horizontal da API.
+A infraestrutura está organizada em uma VPC na região **`us-east-2` (Ohio)**. O nó EC2 executa K3s em uma subnet pública, enquanto o RDS e as interfaces de rede da Lambda utilizam subnets privadas. A API é exposta dentro do cluster por um Service **ClusterIP**, com acesso operacional por SSM e encaminhamento de portas.
 
-![Infraestrutura Provisionada](docs/images/infraestrutura-provisionada.png)
+| Componente | Papel na arquitetura |
+| --- | --- |
+| **Amazon VPC e Security Groups** | Segmentação da rede e acesso ao PostgreSQL na porta 5432 restrito aos grupos da aplicação e da autenticação. |
+| **Amazon EC2 + K3s** | Execução dos containers da API, probes de saúde, limites de recursos e HPA de **1 a 3 réplicas**, com alvos de CPU de 70% e memória de 75%. |
+| **Amazon RDS PostgreSQL** | Banco `oficina_db` privado, armazenamento gp3 criptografado de 20 GiB, Single-AZ e retenção de backup configurada em um dia. Conexões com TLS e `verify-full`. |
+| **Amazon ECR** | Armazenamento da imagem da API, tags imutáveis e promoção pelo identificador `sha256` da imagem. |
+| **AWS Lambda + API Gateway** | Emissão de JWT CUSTOMER RS256 e contrato `POST /auth/token`. A Lambda consulta uma view de identidade com usuário de banco restrito. |
+| **AWS Secrets Manager + IAM** | Segredos e permissões separados por consumidor; acesso da Lambda ao Secrets Manager por endpoint privado da VPC. |
+| **AWS Systems Manager** | Administração do nó, comandos de operação e acesso às ferramentas internas. |
+| **Amazon S3** | State remoto do Terraform separado por stack, com versionamento e criptografia. |
+| **Prometheus, Grafana e Tempo** | Stack de observabilidade definida nos manifests de staging, com acesso privado. CloudWatch recebe os logs configurados para Lambda e API Gateway. |
 
-### Fluxo de deploy e execução
+O staging utiliza **um nó EC2 e RDS Single-AZ**. O HPA escala os pods dentro da capacidade desse nó. A autenticação Lambda é usada em janelas controladas de demonstração com identidades sintéticas; fora dessas janelas, sua concorrência é zero. O endpoint público padrão do API Gateway permanece desabilitado.
 
-O fluxo de entrega contempla versionamento no GitLab, validação em CI, build da imagem, execução funcional com Docker Compose e execução arquitetural com Terraform, Kind e Kubernetes. O ambiente Kubernetes pode ser inspecionado com `kubectl` para pods, services, deployments e HPA.
+O [guia de consolidação de staging](docs/staging/consolidation.md) reúne a configuração de homologação, o HPA e a seleção de imagens por digest. O [runbook de promoção](docs/staging/promotion-manual.md) descreve como verificar a imagem publicada no ECR e promover a release no K3s via SSM.
 
-![Fluxo de Deploy e Execução](docs/images/fluxo-deploy-execucao.png)
+## Provisionamento e entrega
 
-## Vídeo de apresentação
+![Fluxo de provisionamento e entrega: stacks Terraform, validações CI, ECR e promoção manual no K3s via SSM](docs/images/oficina-provisionamento-entrega.svg)
 
-Link do vídeo no YouTube: https://youtu.be/8tpXe1BIx18
+### Quatro repositórios, responsabilidades definidas
 
----
+| Repositório | Responsabilidade |
+| --- | --- |
+| [**Aplicação · este repositório**](https://github.com/ppdssdev/tech-challenge-oficina) | API Java, domínio, migrations Flyway, imagem Docker, manifests Kubernetes e observabilidade. |
+| [**Infraestrutura K3s**](https://github.com/ppdssdev/tech-challenge-oficina-infra-k3s) | Terraform da VPC, subnets, Security Groups, EC2/K3s, ECR, IAM/SSM e endpoint do Secrets Manager. |
+| [**Infraestrutura RDS**](https://github.com/ppdssdev/tech-challenge-oficina-infra-rds) | Terraform do PostgreSQL gerenciado, subnet group, acesso privado, armazenamento e backups. |
+| [**Autenticação Lambda**](https://github.com/ppdssdev/tech-challenge-oficina-auth-lambda) | Emissor Python de JWT RS256, integração com identidade no RDS e Terraform da Lambda/API Gateway. |
 
-## Stack
+Cada stack tem seu próprio state. Os repositórios se integram por contratos de outputs, como VPC, subnets privadas, Security Groups e endpoint do banco. O Terraform em [`infra/terraform/local`](infra/terraform/local/README.md), dentro deste repositório, atende ao ambiente **Kind local**; os recursos AWS são gerenciados nos repositórios acima.
 
-- Java 21
-- Spring Boot 3.5.14
-- Spring Web
-- Spring Data JPA
-- Spring Mail
-- Spring Security
-- JWT
-- Spring Boot Actuator e Micrometer Prometheus
-- PostgreSQL
-- Flyway
-- Swagger/OpenAPI
-- Docker e Docker Compose
-- Prometheus e Grafana locais
-- Mailpit para SMTP e caixa de e-mail locais
-- Kubernetes local com Kind e Terraform local
-- JUnit 5
-- JaCoCo
-- H2 para testes rápidos de unidade/aplicação
-- Testcontainers com PostgreSQL 16 para testes de integração
+### Ordem de provisionamento
 
----
+1. **Rede e execução:** provisionar a stack K3s com VPC, subnets, grupos de segurança, nó EC2, ECR e permissões de operação. Disponibilizar o contrato de rede para as outras stacks.
+2. **Persistência:** provisionar o RDS privado a partir desse contrato e obter o hostname do banco e as referências de configuração.
+3. **Schema e permissões:** criar as roles PostgreSQL, executar as migrations em um **Job Flyway separado** e aplicar os grants de runtime e leitura de identidade.
+4. **Autenticação:** configurar os segredos, implantar o pacote assinado da Lambda e alinhar emissor, audiência e chaves públicas com a API.
+5. **Aplicação:** fornecer ConfigMaps e Secrets de staging, publicar a imagem no ECR e promover o digest no K3s via SSM. Aguardar o Job de migration antes do rollout quando a release incluir migrations.
+6. **Operação:** verificar readiness/liveness, acesso ao banco, autenticação, HPA e os componentes de observabilidade utilizados na demonstração.
 
-## Por que PostgreSQL?
+O runtime usa `oficina_api` para operações de negócio; migrations usam `oficina_migrator`; a Lambda usa `oficina_lambda` com leitura da view de identidade. Em staging, o Flyway fica desabilitado na API e o Hibernate valida o schema. Assim, escalar a aplicação não executa migrations.
 
-O PostgreSQL foi escolhido por ser um banco relacional robusto, transacional e adequado para um sistema administrativo com dados consistentes entre clientes, veículos, ordens de serviço, serviços e peças.
+Os parâmetros, contratos e procedimentos de Terraform estão nos READMEs das stacks. Para a aplicação, consulte os [contratos de configuração e bootstrap](docs/staging/deployment.md), a [renderização por digest](docs/staging/consolidation.md) e o [procedimento de promoção e rollback](docs/staging/promotion-manual.md). Os documentos de preparação preservam o contexto da etapa em que foram escritos; os manifests versionados e os procedimentos de consolidação orientam a configuração de staging.
 
-A escolha é coerente com o domínio porque o sistema precisa de:
+### Integração contínua e publicação
 
-- integridade referencial entre cliente, veículo e OS;
-- transações para aprovação de orçamento e baixa de estoque;
-- tipos numéricos precisos para valores monetários;
-- suporte nativo a UUID;
-- boa maturidade para consultas administrativas e métricas.
+O **GitHub Actions** executa validações em pushes e pull requests para `main`. Na aplicação, o workflow [CI](.github/workflows/ci.yml) verifica:
 
----
+- testes Maven, integração com PostgreSQL via Testcontainers e cobertura JaCoCo;
+- build e inspeção da imagem Docker;
+- formatação e validação do Terraform local;
+- renderização dos manifests local/staging, validação de schemas Kubernetes e configuração de staging.
 
-## Funcionalidades implementadas
+Há também workflows de [validação de observabilidade](.github/workflows/observability-validate.yml) e [smoke test com Kind](.github/workflows/kind-smoke.yml). Os demais repositórios possuem pipelines próprios para Python, empacotamento e infraestrutura.
 
-### Ordem de Serviço
+A **publicação no ECR e a promoção em staging são manuais**, com credenciais temporárias e acesso SSM. O operador utiliza [`release-local.sh`](scripts/staging/release-local.sh) para publicar e o runbook de promoção para aplicar o digest revisado. A automação de CI valida o código e os artefatos; a execução da entrega AWS segue esse procedimento operacional.
 
-- Criação de OS com identificação do cliente por CPF/CNPJ.
-- Cadastro automático do cliente, caso ainda não exista.
-- Cadastro automático do veículo, caso ainda não exista.
-- Inclusão de serviços solicitados.
-- Inclusão de peças e insumos necessários.
-- Orçamento calculado automaticamente.
-- Status automático para `WAITING_APPROVAL` quando existe orçamento.
-- Notificação de orçamento persistida em outbox e enviada ao Mailpit, sem provedor externo pago.
-- Aprovação ou recusa externa do orçamento pelo cliente.
-- Baixa de estoque das peças somente no momento da aprovação.
-- Finalização da OS.
-- Entrega da OS.
-- Consulta pública de andamento por código da OS + CPF/CNPJ.
+## Arquitetura da aplicação
 
-### Status da OS
-
-- `RECEIVED` — Recebida
-- `IN_DIAGNOSIS` — Em diagnóstico
-- `WAITING_APPROVAL` — Aguardando aprovação
-- `IN_EXECUTION` — Em execução
-- `BUDGET_REJECTED` — Orçamento recusado
-- `FINALIZED` — Finalizada
-- `DELIVERED` — Entregue
-
-### Gestão administrativa
-
-- CRUD de clientes.
-- CRUD de veículos.
-- CRUD de serviços.
-- CRUD de peças/insumos.
-- Controle de estoque.
-- Listagem e detalhamento de ordens de serviço.
-- Filtro de OS por status.
-- Métrica de tempo médio de execução.
-
-### Segurança e qualidade
-
-- Login administrativo com JWT.
-- APIs administrativas protegidas.
-- Consulta pública da OS sem JWT, mas exigindo CPF/CNPJ do cliente.
-- Validação de CPF/CNPJ com Value Object `DocumentNumber`.
-- Validação de placa nos formatos brasileiro antigo e Mercosul com Value Object `VehiclePlate`.
-- Controle de concorrência no estoque com `@Version` em `Part` e locks pessimistas nos fluxos de baixa/incremento.
-- Imagem Docker final baseada em Alpine, com pacotes atualizados e execução por usuário não-root.
-- Dependências revisadas após scan de vulnerabilidades com Trivy.
-- Testes unitários de domínio.
-- Testes de serviços de aplicação com mocks.
-- Testes de tratamento de exceções e status HTTP.
-- Teste de integração do fluxo principal da OS.
-- JaCoCo configurado para cobertura mínima de 80% nos pacotes críticos de domínio.
-
----
-
-## Estrutura de pacotes
+A API é um **monólito modular com arquitetura hexagonal**. As regras de negócio ficam no domínio, os casos de uso coordenam as operações e as portas isolam os detalhes de persistência, autenticação e notificação.
 
 ```text
 src/main/java/br/com/fiap/techchallenge/oficina
-├── adapters
-│   ├── in/web
-│   └── out/{notification,persistence,security}
+├── domain          Entidades, objetos de valor, estados e regras de negócio
 ├── application
-│   ├── port/{in,out}
-│   └── usecase
-├── configuration
-└── domain
-    ├── exception
-    ├── model
-    └── service
+│   ├── port/in     Contratos dos casos de uso
+│   ├── port/out    Contratos de persistência e integrações
+│   └── usecase     Orquestração e fronteiras transacionais
+├── adapters
+│   ├── in/web      Controllers REST, DTOs e tratamento de erros
+│   └── out         Persistência JPA, segurança e notificações
+└── configuration   Composição das dependências e configuração Spring
 ```
 
-### Camadas
+O agregado **`WorkOrder`** controla o ciclo de vida da OS, a composição do orçamento e as transições de estado. Os itens guardam os preços usados na contratação, e o histórico de status é persistido na mesma transação da ordem. CPF/CNPJ e placa são tratados por objetos de valor e validações do domínio.
 
-- `adapters/in`: entrada REST, DTOs e tratamento de erros.
-- `application`: portas e orquestração dos casos de uso.
-- `domain`: entidades, estados, validações e regras de negócio.
-- `adapters/out`: persistência com JPA, envio SMTP local e segurança.
-- `configuration`: composição dos casos de uso e configuração Spring.
+O PostgreSQL sustenta integridade referencial, valores monetários precisos e transações entre ordem de serviço, estoque e histórico. Na aprovação, locks protegem a OS e as peças envolvidas; a entidade persistente de peça também usa versionamento otimista. A aprovação por código aceita `Idempotency-Key`, evitando repetir a baixa de estoque em uma tentativa reenviada com a mesma chave e os mesmos dados.
 
-### DDD no projeto
+A outbox persiste a intenção de notificação e distribui o processamento entre workers por claim transacional com `FOR UPDATE SKIP LOCKED`. As mensagens passam por `PENDING`, `PROCESSING`, `SENT` ou `FAILED`, com limite de tentativas e recuperação de claims expirados. No ambiente local, o adapter SMTP entrega ao Mailpit. Em staging, o processamento automático está desabilitado no perfil até a configuração do SMTP.
 
-O projeto usa DDD de forma pragmática dentro de um monólito em camadas:
+### Segurança e identidade
 
-- `WorkOrder` é o agregado central da ordem de serviço e protege o ciclo de vida da OS.
-- `WorkOrderServiceItem` e `WorkOrderPartItem` pertencem ao agregado `WorkOrder`.
-- `DocumentNumber` é um Value Object para CPF/CNPJ, mantendo normalização e validação no domínio.
-- `VehiclePlate` é um Value Object para placa, mantendo normalização e validação no domínio.
-- `Part` controla regras de estoque, como baixa, incremento, estoque mínimo e concorrência.
-- Serviços de aplicação coordenam casos de uso e transações, mas regras críticas ficam no domínio.
+| Acesso | Autenticação e autorização |
+| --- | --- |
+| **Administrativo** | Login com credenciais persistidas, JWT HMAC e papel `ADMIN` nas rotas `/api/v1/admin/**`. |
+| **Cliente** | JWT RS256 emitido pela Lambda, validação de assinatura, emissor, audiência e validade; consulta limitada ao proprietário da OS. |
+| **Consulta por UUID** | `/api/v1/customer/work-orders/{id}` utiliza o Resource Server com JWKS via HTTPS. |
+| **Consulta e decisão por código** | `/api/v1/public/work-orders/{code}/...` exige autenticação ADMIN ou CUSTOMER; para CUSTOMER, valida a propriedade. O documento também é enviado no corpo. |
 
-## Idempotência
+O prefixo histórico `/public` **exige autenticação**. As chaves e cadeias de validação ADMIN e CUSTOMER são separadas. Os detalhes estão no [ADR de domínios de confiança](docs/adr/0005-admin-customer-trust-domains.md) e no [contrato de integração RS256](docs/fase3/customer-rs256-integration.md).
 
-O endpoint público `POST /api/v1/public/work-orders/{code}/budget/approve` aceita opcionalmente o header `Idempotency-Key`. Ele evita dupla aprovação e dupla baixa de estoque em retries causados por timeout, duplo clique ou repetição do cliente.
+## Stack
 
-A chave é vinculada à operação `PUBLIC_BUDGET_APPROVE`, ao código da OS e ao documento normalizado do cliente. A primeira chamada valida o documento, bloqueia a OS e as peças, aprova o orçamento, baixa o estoque e conclui o registro de idempotência na mesma transação. Uma repetição com a mesma chave e a mesma requisição retorna `200 OK` com o status público atual, sem executar novamente os efeitos. A reutilização da chave com outro código ou documento retorna `409 Conflict`. Sem o header, o fluxo mantém o comportamento normal e as regras de estado existentes.
-
-```bash
-curl -X POST http://localhost:8080/api/v1/public/work-orders/{code}/budget/approve \
-  -H "Content-Type: application/json" \
-  -H "Idempotency-Key: approve-{code}-001" \
-  -d '{"document":"12345678909"}'
-```
-
-Somente o hash SHA-256 da operação, código e documento normalizado é persistido; o payload bruto, o JWT e o documento não são armazenados no registro técnico. A unicidade de `(operation, idempotency_key)`, o `INSERT ... ON CONFLICT` e o lock pessimista protegem chamadas concorrentes entre réplicas.
-
-## Outbox com claim transacional
-
-O worker não envia mensagens apenas consultando itens `PENDING`. Primeiro ele reivindica um lote em uma transação curta com `FOR UPDATE SKIP LOCKED`, altera os itens para `PROCESSING`, incrementa `attempts` e confirma a transação. O e-mail é enviado somente depois do commit; em seguida, outra transação curta marca cada item como `SENT`, devolve-o a `PENDING` para retry ou o encerra como `FAILED`.
-
-Os estados são:
-
-- `PENDING`: disponível para claim;
-- `PROCESSING`: reivindicada por um worker;
-- `SENT`: enviada com sucesso;
-- `FAILED`: falha definitiva após o limite de tentativas.
-
-Por padrão, são realizadas até três tentativas. Itens `PROCESSING` cujo `updated_at` ultrapasse 300 segundos são considerados abandonados e podem ser reivindicados novamente, cobrindo a queda de uma instância após o claim. Os valores são configuráveis por `APP_NOTIFICATION_OUTBOX_MAX_ATTEMPTS` e `APP_NOTIFICATION_OUTBOX_PROCESSING_TIMEOUT_SECONDS`.
-
-Esse claim é necessário porque o HPA permite múltiplas réplicas e, portanto, múltiplos schedulers. O `SKIP LOCKED` distribui os registros entre workers concorrentes sem que duas réplicas reivindiquem a mesma mensagem. Em ambiente local, o Mailpit simula o provedor de e-mail; em produção, o adapter pode ser substituído por SES, SendGrid ou outro provedor sem alterar o caso de uso.
-
-### Documentação técnica
-
-- [Roteiro 11 — documentação técnica final e defesa para a banca](docs/roteiro-11-documentacao-final.md)
-- [ADR 0001 — arquitetura hexagonal](docs/adr/0001-arquitetura-hexagonal.md)
-- [Diagramas da solução](docs/diagrams.pdf)
-- [Linguagem ubíqua](docs/linguagem-ubiqua.pdf)
-- [Event Storming](docs/Event%20Storming%20Oficina%20Mecanica.pdf)
-- [Roteiro original da apresentação](docs/roteiro-apresentacao.pdf)
-
-O Roteiro 11 é a fonte atualizada para a documentação e a defesa final. Os PDFs
-existentes permanecem como artefatos da fase em que foram produzidos.
-
----
-
-## Guia rápido para avaliadores
-
-Este roteiro sobe o ambiente completo, autentica no Swagger e valida o fluxo principal da ordem de serviço.
-
-### 1. Subir a aplicação
-
-Na raiz do projeto:
-
-```bash
-docker compose up --build
-```
-
-Para rodar em segundo plano:
-
-```bash
-docker compose up -d
-docker compose logs -f api
-```
-
-A caixa de e-mail local do Mailpit fica em `http://localhost:8025`; o SMTP local escuta em `localhost:1025`. Todo o fluxo usa ferramentas gratuitas e locais, sem SendGrid, Twilio, SES ou outro serviço externo pago.
-
-Se já existir um banco local com migrations antigas e o Flyway acusar erro de checksum, zere o ambiente local de teste:
-
-```bash
-docker compose down -v
-docker compose up --build
-```
-
-Use `docker compose down -v` somente quando puder apagar os dados locais do PostgreSQL.
-
-### 2. Validar saúde da API
-
-```bash
-curl http://localhost:8080/actuator/health
-```
-
-Resposta esperada:
-
-```json
-{"status":"UP"}
-```
-
-### 3. Acessar Swagger
-
-```text
-http://localhost:8080/swagger-ui/index.html
-```
-
-Também pode funcionar via:
-
-```text
-http://localhost:8080/swagger-ui.html
-```
-
-### 4. Fazer login administrativo
-
-Endpoint:
-
-```http
-POST /api/v1/auth/login
-```
-
-Payload:
-
-```json
-{
-  "username": "admin",
-  "password": "admin123"
-}
-```
-
-Copie o campo `accessToken`, clique em `Authorize` no Swagger e informe:
-
-```text
-Bearer SEU_TOKEN_AQUI
-```
-
-### 5. Executar fluxo principal da OS
-
-Crie uma ordem de serviço:
-
-```http
-POST /api/v1/admin/work-orders
-```
-
-Payload:
-
-```json
-{
-  "customer": {
-    "fullName": "Maria Silva",
-    "documentType": "CPF",
-    "documentNumber": "529.982.247-25",
-    "email": "maria@email.com",
-    "phone": "31999999999"
-  },
-  "vehicle": {
-    "plate": "ABC1D23",
-    "brand": "Fiat",
-    "model": "Argo",
-    "manufacturingYear": 2020
-  },
-  "services": [
-    {
-      "serviceId": "11111111-1111-1111-1111-111111111111",
-      "quantity": 1
-    }
-  ],
-  "parts": [
-    {
-      "partId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-      "quantity": 1
-    }
-  ],
-  "diagnosticNotes": "Cliente solicitou manutenção preventiva."
-}
-```
-
-Copie da resposta:
-
-- `id`: usado nos próximos endpoints administrativos;
-- `code`: usado na consulta pública do cliente;
-- `status`: esperado como `WAITING_APPROVAL`, pois a OS já nasce com orçamento calculado.
-
-Depois execute, nesta ordem:
-
-```http
-POST /api/v1/admin/work-orders/{id}/budget/notify
-POST /api/v1/admin/notifications/outbox/process
-POST /api/v1/public/work-orders/{code}/budget/approve
-POST /api/v1/admin/work-orders/{id}/finish
-POST /api/v1/admin/work-orders/{id}/deliver
-```
-
-O endpoint de notificação não altera o status da OS. Ele grava uma mensagem `PENDING` na outbox e retorna a prévia com os links públicos. O scheduler processa a fila automaticamente; o endpoint administrativo permite dispará-la manualmente na demonstração. Antes do envio, a mensagem é reivindicada como `PROCESSING`; depois passa a `SENT`. Uma falha registra `attempts` e `lastError`, volta a `PENDING` enquanto houver tentativas e termina em `FAILED` ao atingir o limite, sem interromper o restante do lote.
-
-O endpoint `POST /api/v1/admin/work-orders/{id}/diagnosis/start` é usado para OS em `RECEIVED`. No fluxo acima, a OS já vai para `WAITING_APPROVAL`; se chamar diagnóstico nesse estado, a API retorna `422 Unprocessable Entity`, porque viola a transição permitida do domínio.
-
-### 6. Consultar andamento pelo cliente
-
-```http
-POST /api/v1/public/work-orders/{code}/status
-Content-Type: application/json
-
-{"document":"52998224725"}
-```
-
-Esse endpoint é público, mas exige o documento do cliente para evitar consulta aberta somente pelo código da OS.
-
-O cliente também pode decidir o orçamento sem JWT, informando seu documento no corpo:
-
-```http
-POST /api/v1/public/work-orders/{code}/budget/approve
-POST /api/v1/public/work-orders/{code}/budget/reject
-```
-
-```json
-{
-  "document": "52998224725"
-}
-```
-
-A aprovação move a OS para `IN_EXECUTION` e reserva o estoque pendente. A recusa do orçamento inicial move a OS para `BUDGET_REJECTED`, sem iniciar a execução ou baixar estoque.
-
-### 7. Consultar tempo médio de execução
-
-Sem filtro:
-
-```http
-GET /api/v1/admin/metrics/average-execution-time
-```
-
-Com intervalo:
-
-```http
-GET /api/v1/admin/metrics/average-execution-time?from=2026-06-30T00:00:00-03:00&to=2026-06-30T23:59:59-03:00
-```
-
-Os filtros `from` e `to` são opcionais e usam data/hora ISO com offset.
-
-### 8. Testar CRUDs administrativos
-
-Com o token JWT, os avaliadores também podem validar pelo Swagger:
-
-- clientes: `/api/v1/admin/customers`;
-- veículos: `/api/v1/admin/vehicles`;
-- serviços: `/api/v1/admin/services`;
-- peças e estoque: `/api/v1/admin/parts`;
-- ordens de serviço: `/api/v1/admin/work-orders`.
-
----
+| Área | Tecnologias |
+| --- | --- |
+| Aplicação | Java 21, Spring Boot 3.5.14, Spring Web, Spring Security, Bean Validation |
+| Persistência | PostgreSQL, Spring Data JPA, Flyway |
+| Contratos | REST, OpenAPI/Swagger, JWT HMAC e RS256 |
+| Infraestrutura | Terraform, AWS, Docker, Kubernetes/K3s, Kind para desenvolvimento |
+| Observabilidade | Actuator, Micrometer, Prometheus, Grafana, OpenTelemetry e Tempo |
+| Qualidade | JUnit 5, Mockito, Testcontainers, JaCoCo e GitHub Actions |
 
 ## Execução local
 
-### Pré-requisitos
-
-- Docker
-- Docker Compose
-
 ### Docker Compose
 
-Subir ambiente completo:
-
-```bash
-docker compose up --build
-```
-
-A aplicação ficará disponível em:
-
-```text
-http://localhost:8080
-```
-
-O PostgreSQL ficará disponível em:
-
-```text
-localhost:5432
-```
-
-O Mailpit ficará disponível em:
-
-```text
-UI:   http://localhost:8025
-SMTP: localhost:1025
-```
-
-Credenciais do banco:
-
-```text
-database: oficina_db
-username: oficina
-password: oficina
-```
-
-Para conectar no DBeaver ou outro client SQL:
-
-```text
-host: localhost
-port: 5432
-database: oficina_db
-username: oficina
-password: oficina
-```
-
-### Aplicação fora do Docker
-
-Suba PostgreSQL e Mailpit:
-
-```bash
-docker compose up -d postgres mailpit
-```
-
-Depois execute a aplicação pela IDE ou via Maven:
-
-```bash
-mvn spring-boot:run
-```
-
----
-
-## Observabilidade AWS staging
-
-A stack privada de Prometheus/Grafana tem manifests independentes, instalação manual com rollback e acesso por SSM. Consulte o [runbook de observabilidade staging](docs/staging/observability.md).
-
-## Observabilidade local
-
-A API publica métricas do Spring Boot Actuator no endpoint `/actuator/prometheus` usando Micrometer Prometheus. O Prometheus coleta essas métricas a cada 15 segundos, e o Grafana recebe automaticamente o datasource Prometheus e o dashboard versionado **Oficina API - Observabilidade local**.
-
-O dashboard apresenta status da API, taxa e latência média das requisições HTTP, memória da JVM, CPU do processo e quantidades da outbox nos estados `PENDING`, `PROCESSING` e `FAILED`. Toda a solução é gratuita e executada localmente: não usa Grafana Cloud, Datadog, New Relic, CloudWatch ou qualquer outro serviço pago. Também não inclui tracing distribuído, Loki, Alertmanager, Helm ou Prometheus Operator.
-
-### Docker Compose
-
-Suba todo o ambiente em segundo plano:
+Pré-requisitos: **Docker e Docker Compose**. Na raiz do projeto:
 
 ```bash
 docker compose up -d --build
+docker compose logs -f api
 ```
 
-Serviços disponíveis:
+| Serviço | Endereço local |
+| --- | --- |
+| API | http://localhost:8080 |
+| Swagger UI | http://localhost:8080/swagger-ui/index.html |
+| Health | http://localhost:8080/actuator/health |
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 |
+| Mailpit | http://localhost:8025 |
+| PostgreSQL | `localhost:5432/oficina_db` |
 
-```text
-API:                 http://localhost:8080
-Health:              http://localhost:8080/actuator/health
-Métricas Prometheus: http://localhost:8080/actuator/prometheus
-Prometheus:          http://localhost:9090
-Grafana:             http://localhost:3000
-Mailpit:             http://localhost:8025
-```
+Credenciais exclusivas do ambiente local: **API `admin` / `admin123`**, **Grafana `admin` / `admin`** e **PostgreSQL `oficina` / `oficina`**. O Compose ativa o perfil `local` e mantém os serviços publicados em loopback.
 
-O acesso inicial do Grafana é `admin` / `admin`. No Prometheus, consulte **Status > Targets** e confirme o target `oficina-api` como `UP`. No Grafana, abra a pasta **Oficina** para acessar o dashboard provisionado.
-
-### Kubernetes/Kind
-
-Depois de criar o cluster e carregar a imagem local conforme a seção seguinte, aplique todos os manifests — incluindo Prometheus e Grafana — e inicie os quatro port-forwards:
+Para executar a API pela IDE ou pelo Maven, com **JDK 21 e Maven** instalados:
 
 ```bash
-kubectl apply -k k8s/local
-./scripts/k8s-port-forward.sh
+docker compose up -d postgres mailpit
+SPRING_PROFILES_ACTIVE=local mvn spring-boot:run
 ```
 
-O script expõe API em `8080`, Mailpit em `8025`, Prometheus em `9090` e Grafana em `3000`. Pressione `Ctrl+C` para encerrar todos. Os comandos equivalentes são:
+### Kubernetes com Kind
+
+Com Docker, Kind e kubectl disponíveis:
 
 ```bash
-kubectl -n oficina port-forward svc/oficina-api 8080:8080
-kubectl -n oficina port-forward svc/oficina-mailpit 8025:8025
-kubectl -n oficina port-forward svc/oficina-prometheus 9090:9090
-kubectl -n oficina port-forward svc/oficina-grafana 3000:3000
+bash scripts/kind-create.sh
+kubectl config use-context kind-oficina-local
+bash scripts/kind-load-image.sh
+bash scripts/k8s-install-metrics-server.sh
+bash scripts/k8s-deploy-local.sh
+bash scripts/k8s-port-forward.sh
 ```
 
-Os quatro Services são `ClusterIP`; não há Ingress, `NodePort` ou `LoadBalancer`.
+O cluster local executa API, PostgreSQL, Mailpit, Prometheus e Grafana. Os serviços ficam disponíveis por `port-forward`. Como alternativa, o [guia Terraform local](infra/terraform/local/README.md) gerencia esse ambiente por infraestrutura como código; escolha um dos fluxos para gerenciar o mesmo cluster.
 
----
+## Demonstração da API
 
-## Execução local com Kubernetes/Kind
+O Swagger apresenta os contratos completos. O roteiro abaixo utiliza o ambiente local e uma identidade sintética.
 
-Esta opção executa gratuitamente a API, o PostgreSQL, o Mailpit, o Prometheus e o Grafana dentro de um cluster Kubernetes local criado com Kind. Ela não usa EKS ou outro serviço de cloud, registry privado, Helm, Ingress ou `LoadBalancer`; os acessos locais são feitos com `port-forward`.
-
-### Pré-requisitos
-
-- Docker com o daemon em execução
-- `kubectl`
-- `kind`
-
-### 1. Criar o cluster
-
-O nome `oficina-local` é informado pela linha de comando; o arquivo de configuração mantém apenas a topologia de um nó para continuar compatível com o schema do Kind.
+### 1. Fazer login
 
 ```bash
-kind create cluster \
-  --name oficina-local \
-  --config k8s/kind/oficina-kind.yaml
-```
-
-O script equivalente é idempotente e não recria o cluster caso ele já exista:
-
-```bash
-./scripts/kind-create.sh
-```
-
-### 2. Buildar e carregar a imagem local
-
-Não é necessário publicar a imagem em um registry externo:
-
-```bash
-docker build -t tech-challenge-oficina:local .
-kind load docker-image tech-challenge-oficina:local --name oficina-local
-```
-
-Ou execute os dois comandos com:
-
-```bash
-./scripts/kind-load-image.sh
-```
-
-Sempre repita o build e o carregamento após alterar a aplicação. O Deployment usa `imagePullPolicy: IfNotPresent` para aproveitar a imagem carregada diretamente nos nós do Kind.
-
-### 3. Implantar os recursos
-
-```bash
-kubectl apply -k k8s/local
-kubectl -n oficina rollout status deployment/oficina-api --timeout=300s
-kubectl get pods -n oficina
-kubectl get svc -n oficina
-```
-
-O script de deploy aguarda os Deployments do PostgreSQL, Mailpit, API, Prometheus e Grafana:
-
-```bash
-./scripts/k8s-deploy-local.sh
-```
-
-Todos os recursos ficam no namespace `oficina`. O PostgreSQL usa um PVC local e seu Service é somente `ClusterIP`, portanto o banco não é exposto fora do cluster.
-
-Para diagnóstico operacional:
-
-```bash
-kubectl -n oficina get pods,svc,pvc
-kubectl -n oficina describe pod -l app=oficina-api
-kubectl -n oficina logs deployment/oficina-api
-```
-
-### Horizontal Pod Autoscaler (HPA)
-
-O Kustomize inclui o HPA `oficina-api-hpa`, que escala somente o Deployment `oficina-api` entre 1 e 3 réplicas. Os alvos médios de utilização são 70% de CPU e 75% de memória. O Deployment declara `resources.requests` e `resources.limits` para ambos os recursos, incluindo os requests necessários para que o HPA calcule a utilização.
-
-O HPA é criado normalmente por `kubectl apply -k k8s/local`. Para receber métricas de CPU e memória no Kind, instale o Metrics Server com o script local:
-
-```bash
-./scripts/k8s-install-metrics-server.sh
-```
-
-O script aplica o manifest oficial no namespace `kube-system`, habilita `--kubelet-insecure-tls` para compatibilidade com o Kind e aguarda o rollout. Sem Metrics Server, o recurso HPA continua criado, mas seus valores podem aparecer como `<unknown>` e não haverá escala baseada nessas métricas. Em clusters de cloud, como EKS, AKS ou GKE, o serviço de métricas de recursos deve estar instalado ou habilitado conforme a configuração do cluster.
-
-Comandos de validação:
-
-```bash
-kubectl apply -k k8s/local
-kubectl -n oficina get hpa
-kubectl -n oficina describe hpa oficina-api-hpa
-kubectl -n oficina top pods
-```
-
-O HPA não escala PostgreSQL, Mailpit, Prometheus ou Grafana. Em produção, o banco exige uma estratégia própria, como serviço gerenciado (RDS/Aurora), replicação e tuning adequados à carga.
-
-A API também contém um scheduler da outbox. Como o HPA pode manter várias réplicas, o processador usa claim transacional, estado `PROCESSING` e `SELECT FOR UPDATE SKIP LOCKED`. Cada mensagem fica bloqueada e é atribuída a um único worker antes do envio, impedindo que schedulers concorrentes processem simultaneamente o mesmo registro.
-
-### 4. Acessar e validar a API
-
-Em um terminal, mantenha o port-forward ativo:
-
-```bash
-kubectl -n oficina port-forward svc/oficina-api 8080:8080
-```
-
-Em outro terminal, valide o Actuator:
-
-```bash
-curl http://localhost:8080/actuator/health
-```
-
-Resposta esperada:
-
-```json
-{"status":"UP"}
-```
-
-Com o port-forward ativo, a API e o Swagger ficam disponíveis em:
-
-```text
-API:     http://localhost:8080
-Swagger: http://localhost:8080/swagger-ui/index.html
-```
-
-### 5. Acessar o Mailpit
-
-Em outro terminal, mantenha o port-forward da interface web ativo:
-
-```bash
-kubectl -n oficina port-forward svc/oficina-mailpit 8025:8025
-```
-
-Acesse `http://localhost:8025`. Dentro do cluster, a API envia os e-mails por `oficina-mailpit:1025`. Como `APP_PUBLIC_BASE_URL` vale `http://localhost:8080`, os links de aprovação ou recusa enviados por e-mail funcionam enquanto o port-forward da API estiver ativo.
-
-Para iniciar os quatro port-forwards com um único comando e encerrá-los juntos com `Ctrl+C`:
-
-```bash
-./scripts/k8s-port-forward.sh
-```
-
-### 6. Destruir o ambiente
-
-```bash
-kubectl delete -k k8s/local
-kind delete cluster --name oficina-local
-```
-
-Ou:
-
-```bash
-./scripts/k8s-destroy-local.sh
-```
-
-A exclusão do cluster remove também o volume local e os dados do PostgreSQL desse ambiente.
-
-Os valores de `k8s/local/secret.yaml` são credenciais previsíveis criadas exclusivamente para demonstração local. Eles não são secrets reais de produção. Em um ambiente real, os valores sensíveis devem ser gerenciados por uma solução apropriada, com acesso restrito e sem versionamento no repositório.
-
----
-
-## Infraestrutura local com Terraform
-
-Além dos comandos diretos com Kind e `kubectl`, o projeto possui um fluxo Terraform opcional que cria o cluster, builda e carrega a imagem local e aplica a mesma base Kustomize. Ele mantém estado apenas local, não usa Terraform Cloud, AWS/EKS, Helm, registry externo ou ferramenta paga.
-
-Use apenas um fluxo para gerenciar o cluster `oficina-local`. Se ele foi criado pelos scripts do Kind, destrua-o antes do primeiro `terraform apply`.
-
-```bash
-cd infra/terraform/local
-terraform init
-terraform plan
-terraform apply
-export KUBECONFIG="$(terraform output -raw kubeconfig_path)"
-```
-
-Depois, os acessos continuam via port-forward:
-
-```bash
-kubectl -n oficina port-forward svc/oficina-api 8080:8080
-curl http://localhost:8080/actuator/health
-```
-
-Para remover os manifests e o cluster gerenciados pelo Terraform:
-
-```bash
-terraform destroy
-```
-
-O guia detalhado está em [Terraform local com Kind](infra/terraform/local/README.md). Quem preferir pode continuar usando os scripts diretos documentados nesta seção.
-
----
-
-## CI/CD com GitHub Actions
-
-O workflow [CI](.github/workflows/ci.yml) roda automaticamente em pushes e pull requests para a branch `main`. Os jobs separados tornam visíveis as validações de aplicação, imagem e infraestrutura:
-
-- executa `mvn -B clean verify`, incluindo os testes de integração com PostgreSQL via Testcontainers e a verificação de cobertura JaCoCo;
-- disponibiliza o relatório HTML do JaCoCo como artefato da execução, inclusive para facilitar o diagnóstico de uma falha;
-- builda e inspeciona a imagem Docker da API, sem publicá-la;
-- verifica a formatação, inicializa e valida o módulo Terraform local, sem executar `terraform apply`;
-- renderiza a base `k8s/local` com `kubectl kustomize` e confirma que o resultado não está vazio, sem aplicar recursos em um cluster.
-
-O workflow [Kind Smoke Test](.github/workflows/kind-smoke.yml) é iniciado manualmente pela opção **Run workflow** do GitHub Actions. Ele cria o cluster `oficina-local` no runner, builda e carrega a imagem diretamente no Kind, aplica `k8s/local`, aguarda os rollouts do PostgreSQL, Mailpit, API, Prometheus e Grafana e valida os endpoints `/actuator/health` e `/actuator/prometheus` por port-forward. Em caso de falha, coleta estado, descrição e logs dos pods; ao final, sempre remove o cluster.
-
-Esse pipeline simula uma entrega local e reprodutível. Não faz deploy em cloud, não usa serviço pago nem credenciais externas e não publica imagens no Docker Hub, GHCR ou outro registry.
-
-Comandos locais equivalentes ao CI principal:
-
-```bash
-mvn clean verify
-docker build -t tech-challenge-oficina:local .
-terraform -chdir=infra/terraform/local fmt -check -recursive
-terraform -chdir=infra/terraform/local init
-terraform -chdir=infra/terraform/local validate
-kubectl kustomize k8s/local
-```
-
-Os testes de integração dependem do daemon Docker para que o Testcontainers suba o PostgreSQL. O workflow não usa um PostgreSQL em `services`, não desabilita testes e não ignora falhas.
-
----
-
-## Login administrativo
-
-Ao iniciar a aplicação, um usuário administrativo padrão é criado automaticamente se ainda não existir.
-
-```text
-username: admin
-password: admin123
-```
-
-Esses valores podem ser alterados por variáveis de ambiente:
-
-```text
-APP_ADMIN_DEFAULT_USERNAME
-APP_ADMIN_DEFAULT_PASSWORD
-```
-
-A URL base usada nos links da notificação é `http://localhost:8080` por padrão e pode ser alterada por:
-
-```text
-APP_PUBLIC_BASE_URL
-```
-
-O processamento da outbox e o remetente local podem ser configurados por `APP_NOTIFICATION_OUTBOX_ENABLED`, `APP_NOTIFICATION_OUTBOX_POLL_DELAY_MS`, `APP_NOTIFICATION_OUTBOX_BATCH_SIZE`, `APP_NOTIFICATION_OUTBOX_MAX_ATTEMPTS`, `APP_NOTIFICATION_OUTBOX_PROCESSING_TIMEOUT_SECONDS` e `APP_NOTIFICATION_EMAIL_FROM`.
-
----
-
-## Swagger
-
-Com a aplicação rodando, acesse:
-
-```text
-http://localhost:8080/swagger-ui/index.html
-```
-
-Fluxo recomendado no Swagger:
-
-1. Fazer login em `POST /api/v1/auth/login`.
-2. Copiar o `accessToken`.
-3. Clicar em `Authorize`.
-4. Informar o token no formato:
-
-```text
-Bearer SEU_TOKEN_AQUI
-```
-
----
-
-## Executar testes
-
-Os testes de domínio e aplicação continuam rápidos e isolados; quando precisam de banco em memória, usam o profile `test` com H2. Os testes REST e de persistência usam o profile `it`, sobem um PostgreSQL 16 real via Testcontainers, executam todas as migrations Flyway e validam os mapeamentos JPA com `ddl-auto=validate`.
-
-É necessário ter o Docker em execução para rodar a suíte completa. Se o daemon não estiver disponível, os testes que usam Testcontainers falharão.
-
-Executar todos os testes automatizados:
-
-```bash
-mvn test
-```
-
-Executar testes, empacotamento e verificação de cobertura JaCoCo:
-
-```bash
-mvn clean verify
-```
-
-O Mailpit não é necessário para nenhum desses comandos. O envio de e-mail é validado com `JavaMailSender` mockado, e o scheduler da outbox fica desabilitado no profile `it`; o Mailpit é usado apenas na demonstração local com Docker Compose.
-
-Relatório JaCoCo:
-
-```text
-target/site/jacoco/index.html
-```
-
-Executar scan de vulnerabilidades com Trivy via Docker:
-
-```bash
-mkdir -p target/security
-
-docker run --rm -v "$PWD:/workspace" -v "$HOME/.cache/trivy:/root/.cache" \
-  aquasec/trivy:latest fs --offline-scan --format table \
-  --output /workspace/target/security/trivy-fs.txt /workspace
-
-docker build --progress=plain -t oficina-api:local .
-
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$HOME/.cache/trivy:/root/.cache" \
-  -v "$PWD/target/security:/reports" \
-  aquasec/trivy:latest image --offline-scan --format table \
-  --output /reports/trivy-image.txt oficina-api:local
-```
-
-Tipos de teste existentes:
-
-- domínio: regras puras de `WorkOrder`, `Part`, `Customer`, Value Objects e validators;
-- aplicação: serviços de aplicação com mocks para cenários de erro;
-- API/integração: fluxo REST, autenticação JWT, consulta pública, PostgreSQL real, Flyway e JPA validate;
-- persistência: migrations, constraints e adapter da outbox contra PostgreSQL Testcontainers;
-- exceções: validação dos status HTTP esperados, como `401`, `403`, `404`, `409` e `422`.
-
-Status HTTP principais:
-
-- `400 Bad Request`: payload, parâmetros ou tipos inválidos;
-- `401 Unauthorized`: credenciais inválidas ou JWT ausente/inválido;
-- `403 Forbidden`: usuário autenticado sem permissão;
-- `404 Not Found`: recurso inexistente ou consulta pública com documento divergente;
-- `409 Conflict`: conflito de unicidade/integridade;
-- `422 Unprocessable Entity`: violação de regra de negócio.
-
----
-
-## Endpoints principais
-
-### Autenticação
-
-```http
-POST /api/v1/auth/login
-```
-
-### Clientes
-
-```http
-POST   /api/v1/admin/customers
-GET    /api/v1/admin/customers
-GET    /api/v1/admin/customers/{id}
-PUT    /api/v1/admin/customers/{id}
-DELETE /api/v1/admin/customers/{id}
-```
-
-### Veículos
-
-```http
-POST   /api/v1/admin/vehicles
-GET    /api/v1/admin/vehicles
-GET    /api/v1/admin/vehicles/{id}
-PUT    /api/v1/admin/vehicles/{id}
-DELETE /api/v1/admin/vehicles/{id}
-```
-
-### Serviços
-
-```http
-POST   /api/v1/admin/services
-GET    /api/v1/admin/services
-GET    /api/v1/admin/services/{id}
-PUT    /api/v1/admin/services/{id}
-DELETE /api/v1/admin/services/{id}
-```
-
-### Peças e insumos
-
-```http
-POST   /api/v1/admin/parts
-GET    /api/v1/admin/parts
-GET    /api/v1/admin/parts/below-minimum-stock
-GET    /api/v1/admin/parts/{id}
-PUT    /api/v1/admin/parts/{id}
-POST   /api/v1/admin/parts/{id}/stock/increase
-POST   /api/v1/admin/parts/{id}/stock/decrease
-DELETE /api/v1/admin/parts/{id}
-```
-
-### Ordens de Serviço
-
-`GET /api/v1/admin/work-orders` sem o parâmetro `status` retorna a fila operacional da oficina. A fila contém somente OS nos status `RECEIVED`, `IN_DIAGNOSIS`, `WAITING_APPROVAL` e `IN_EXECUTION`, priorizadas nessa ordem de atendimento: `IN_EXECUTION`, `WAITING_APPROVAL`, `IN_DIAGNOSIS` e `RECEIVED`. Dentro do mesmo status, as OS mais antigas aparecem primeiro.
-
-OS nos status `BUDGET_REJECTED`, `FINALIZED` e `DELIVERED` não são exibidas na fila operacional padrão, mas continuam disponíveis por meio do filtro explícito, por exemplo `?status=BUDGET_REJECTED`, `?status=FINALIZED` ou `?status=DELIVERED`.
-
-```http
-POST /api/v1/admin/work-orders
-GET  /api/v1/admin/work-orders
-GET  /api/v1/admin/work-orders?status=WAITING_APPROVAL
-GET  /api/v1/admin/work-orders/{id}
-POST /api/v1/admin/work-orders/{id}/diagnosis/start
-POST /api/v1/admin/work-orders/{id}/diagnosis/notes
-POST /api/v1/admin/work-orders/{id}/items
-POST /api/v1/admin/work-orders/{id}/budget/notify
-POST /api/v1/admin/notifications/outbox/process
-POST /api/v1/admin/work-orders/{id}/approve
-POST /api/v1/admin/work-orders/{id}/finish
-POST /api/v1/admin/work-orders/{id}/deliver
-```
-
-### Consulta pública do cliente
-
-Os endpoints abaixo não exigem JWT. As decisões de orçamento exigem o documento do cliente no corpo da requisição para validar o acesso à OS.
-
-```http
-POST /api/v1/public/work-orders/{code}/status
-Content-Type: application/json
-
-{"document":"52998224725"}
-POST /api/v1/public/work-orders/{code}/budget/approve
-POST /api/v1/public/work-orders/{code}/budget/reject
-```
-
-A aprovação move a OS para `IN_EXECUTION`; a recusa move o orçamento inicial para `BUDGET_REJECTED`. Os status `FINALIZED` e `DELIVERED` continuam reservados, respectivamente, à finalização técnica e à entrega do veículo.
-
-### Notificação local de orçamento com outbox e Mailpit
-
-O projeto não utiliza serviço pago nem provedor externo. Enquanto a OS estiver em `WAITING_APPROVAL`, o endpoint administrativo abaixo grava, na mesma transação da aplicação, a intenção de envio como `PENDING` na tabela `notification_outbox`:
-
-```http
-POST /api/v1/admin/work-orders/{id}/budget/notify
-```
-
-A resposta contém destinatário, assunto, corpo e os links `approveUrl` e `rejectUrl`. O cliente ainda precisa enviar seu CPF ou CNPJ no body ao chamar um desses endpoints `POST`. A notificação não altera o status da OS nem envia SMTP dentro da requisição. A outbox evita perder a intenção de notificação quando o SMTP está temporariamente indisponível.
-
-Um scheduler reivindica mensagens processáveis a cada cinco segundos com claim transacional e `FOR UPDATE SKIP LOCKED`. Para processar imediatamente, use o endpoint protegido por JWT:
-
-```http
-POST /api/v1/admin/notifications/outbox/process
-```
-
-Depois, abra `http://localhost:8025`, selecione o e-mail e use os links públicos de aprovação ou recusa. O SMTP do Mailpit é totalmente local e não é necessário para `mvn clean verify`.
-
-Exemplo de resposta:
-
-```json
-{
-  "workOrderCode": "OS-20260829-ABC123",
-  "channel": "MAILPIT_EMAIL",
-  "recipient": "cliente@email.com",
-  "subject": "Orçamento da OS OS-20260829-ABC123 aguardando aprovação",
-  "body": "Olá, Maria Silva. O orçamento está aguardando decisão...",
-  "approveUrl": "http://localhost:8080/api/v1/public/work-orders/OS-20260829-ABC123/budget/approve",
-  "rejectUrl": "http://localhost:8080/api/v1/public/work-orders/OS-20260829-ABC123/budget/reject"
-}
-```
-
-### Métricas
-
-```http
-GET /api/v1/admin/metrics/average-execution-time
-```
-
-Os parâmetros `from` e `to` são opcionais e filtram pela data de finalização da OS (`finishedAt`).
-
-Sem filtro:
-
-```http
-GET /api/v1/admin/metrics/average-execution-time
-```
-
-Somente data inicial:
-
-```http
-GET /api/v1/admin/metrics/average-execution-time?from=2026-06-30T00:00:00-03:00
-```
-
-Somente data final:
-
-```http
-GET /api/v1/admin/metrics/average-execution-time?to=2026-06-30T23:59:59-03:00
-```
-
-Intervalo completo:
-
-```http
-GET /api/v1/admin/metrics/average-execution-time?from=2026-06-30T00:00:00-03:00&to=2026-06-30T23:59:59-03:00
-```
-
----
-
-## Exemplo de fluxo com cURL
-
-### 1. Login
-
-```bash
-TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
+curl -sS -X POST http://localhost:8080/api/v1/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"admin123"}' \
-  | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+  -d '{"username":"admin","password":"admin123"}'
 ```
 
-### 2. Criar OS usando dados semeados pelo Flyway
+Copie o `accessToken` retornado para o campo **Authorize** do Swagger. Nos exemplos de cURL, defina `TOKEN` com esse valor e use `Authorization: Bearer $TOKEN`.
+
+### 2. Abrir uma ordem de serviço
+
+Os IDs abaixo correspondem a serviços e peças semeados pelas migrations no banco local.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/admin/work-orders \
+curl -sS -X POST http://localhost:8080/api/v1/admin/work-orders \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{
     "customer": {
-      "fullName": "Maria Silva",
+      "fullName": "Cliente Demonstração",
       "documentType": "CPF",
-      "documentNumber": "529.982.247-25",
-      "email": "maria@email.com",
+      "documentNumber": "52998224725",
+      "email": "cliente@example.com",
       "phone": "31999999999"
     },
     "vehicle": {
@@ -1031,133 +211,98 @@ curl -X POST http://localhost:8080/api/v1/admin/work-orders \
       "model": "Argo",
       "manufacturingYear": 2020
     },
-    "services": [
-      {
-        "serviceId": "11111111-1111-1111-1111-111111111111",
-        "quantity": 1
-      }
-    ],
-    "parts": [
-      {
-        "partId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-        "quantity": 1
-      }
-    ],
-    "diagnosticNotes": "Cliente solicitou manutenção preventiva."
+    "services": [{
+      "serviceId": "11111111-1111-1111-1111-111111111111",
+      "quantity": 1
+    }],
+    "parts": [{
+      "partId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "quantity": 1
+    }],
+    "diagnosticNotes": "Manutenção preventiva."
   }'
 ```
 
-A resposta retorna o `id` e o `code` da OS.
+Guarde o **`id`** e o **`code`** retornados. Como esse exemplo já inclui itens com valor, a OS chega a **`WAITING_APPROVAL`** e está pronta para a decisão do orçamento. A transição de início de diagnóstico é reservada a ordens no estado `RECEIVED`.
 
-### 3. Enfileirar a notificação do orçamento
+### 3. Percorrer o fluxo de atendimento
 
-```bash
-curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/budget/notify \
-  -H "Authorization: Bearer $TOKEN"
-```
+Execute os endpoints abaixo pelo Swagger autenticado, substituindo `{id}` pelo UUID da OS:
 
-O retorno contém a prévia do e-mail e os links públicos de aprovação e recusa. A mensagem fica `PENDING` na outbox.
+| Etapa | Método e endpoint | Resultado |
+| --- | --- | --- |
+| Enfileirar orçamento | `POST /api/v1/admin/work-orders/{id}/budget/notify` | Mensagem persistida na outbox. |
+| Processar notificações | `POST /api/v1/admin/notifications/outbox/process` | Envio para a caixa local do Mailpit. |
+| Aprovar orçamento | `POST /api/v1/admin/work-orders/{id}/approve` | OS em `IN_EXECUTION` e baixa das peças pendentes. |
+| Finalizar serviço | `POST /api/v1/admin/work-orders/{id}/finish` | OS em `FINALIZED`. |
+| Entregar veículo | `POST /api/v1/admin/work-orders/{id}/deliver` | OS em `DELIVERED`. |
 
-### 4. Processar a outbox imediatamente
+O scheduler também processa a outbox automaticamente no ambiente local. Para visualizar a notificação, abra http://localhost:8025.
 
-```bash
-curl -X POST http://localhost:8080/api/v1/admin/notifications/outbox/process \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Resposta esperada para uma mensagem pendente: `{"processed":1,"sent":1,"failed":0}`. O e-mail pode ser visto em `http://localhost:8025`.
-
-### 5. Aprovar ou recusar pelo link público
+A consulta por código exige token e documento no corpo. Para essa demonstração local, use o token ADMIN obtido no primeiro passo:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/public/work-orders/{code}/budget/approve \
-  -H "Content-Type: application/json" \
-  -d '{"document":"52998224725"}'
-
-curl -X POST http://localhost:8080/api/v1/public/work-orders/{code}/budget/reject \
-  -H "Content-Type: application/json" \
+curl -sS -X POST http://localhost:8080/api/v1/public/work-orders/{code}/status \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
   -d '{"document":"52998224725"}'
 ```
 
-### 6. Finalizar OS
+Com a integração CUSTOMER configurada, o proprietário pode consultar a OS e aprovar ou recusar o orçamento nas rotas por código. A aprovação aceita o header opcional `Idempotency-Key`; a recusa de um orçamento inicial leva a OS a `BUDGET_REJECTED` sem baixar estoque.
+
+### Endpoints de referência
+
+| Recurso | Rota base |
+| --- | --- |
+| Login administrativo | `POST /api/v1/auth/login` |
+| Clientes | `/api/v1/admin/customers` |
+| Veículos | `/api/v1/admin/vehicles` |
+| Serviços | `/api/v1/admin/services` |
+| Peças e estoque | `/api/v1/admin/parts` |
+| Ordens de serviço | `/api/v1/admin/work-orders` |
+| Consulta CUSTOMER | `GET /api/v1/customer/work-orders/{id}` |
+| Consulta e decisão por código | `/api/v1/public/work-orders/{code}` |
+| Tempo médio de execução | `GET /api/v1/admin/metrics/average-execution-time` |
+
+A fila administrativa prioriza OS em execução, aguardando aprovação, em diagnóstico e recebidas. Os demais estados podem ser consultados com filtro explícito `?status=...`. A métrica de tempo médio aceita `from` e `to` em data/hora ISO com offset.
+
+## Observabilidade
+
+A API expõe métricas em **`/actuator/prometheus`**. O Prometheus coleta os dados e o Grafana oferece dashboards para acompanhar requisições, latência, erros, JVM, outbox e indicadores de negócio. O histórico de estados sustenta os indicadores de duração por etapa da OS.
+
+No Compose, o datasource e o dashboard local são provisionados automaticamente. Em staging, os manifests da stack ficam em [`k8s/staging/observability`](k8s/staging/observability), com acesso privado por SSM e encaminhamento de portas.
+
+A integração **Micrometer + OpenTelemetry** permite exportar traces para o **Tempo** por OTLP HTTP quando habilitada. A exportação é configurável e desabilitada por padrão. Os logs estruturados permitem correlacionar requisições com `traceId` e `spanId`.
+
+Procedimentos e contratos: [observabilidade staging](docs/staging/observability.md), [Tempo e dashboards](docs/staging/observability-incremental.md), [tracing](docs/fase3/tracing-contract.md) e [métricas de negócio](docs/fase3/business-metrics-contract.md).
+
+## Testes e qualidade
+
+Com **JDK 21, Maven e Docker em execução**, rode:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/finish \
-  -H "Authorization: Bearer $TOKEN"
+mvn -B clean verify
 ```
 
-### 7. Entregar OS
+A suíte cobre domínio, casos de uso, endpoints, autorização, concorrência, persistência e migrations. Os testes de integração utilizam **PostgreSQL 16 com Testcontainers**. O JaCoCo exige **80% de cobertura de linhas nos pacotes críticos de domínio** e gera o relatório em `target/site/jacoco/index.html`.
+
+As verificações de configuração de staging também podem ser executadas localmente, com Python 3, PyYAML e kubectl disponíveis:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/admin/work-orders/{id}/deliver \
-  -H "Authorization: Bearer $TOKEN"
+python3 scripts/staging/test-render.py
+bash -n scripts/staging/render.sh
 ```
 
-### 8. Consulta pública do cliente
+## Documentação
 
-```bash
-curl -X POST "http://localhost:8080/api/v1/public/work-orders/{code}/status" \
-  -H "Content-Type: application/json" \
-  -d '{"document":"52998224725"}'
-```
-
----
-
-## Dados iniciais
-
-O Flyway cria alguns serviços e peças iniciais.
-
-Serviços:
-
-- Troca de óleo
-- Alinhamento
-- Balanceamento
-- Diagnóstico eletrônico
-
-Peças:
-
-- Óleo sintético 5W30 1L
-- Filtro de óleo
-- Filtro de ar
-- Pastilha de freio dianteira
-
----
-
-## Observações sobre o MVP
-
-- O envio de e-mail é local: a outbox persiste a intenção e o adapter SMTP entrega ao Mailpit. Não há dependência de serviço externo pago.
-- O processamento é deliberadamente simples: sem retry avançado, DLQ, lock distribuído, Kafka ou RabbitMQ; falhas são marcadas como `FAILED`.
-- Não há módulo financeiro completo. O foco está em orçamento, autorização, execução e controle de estoque.
-- A baixa de estoque acontece na aprovação do orçamento, não na criação da OS.
-- O endpoint público exige documento do cliente para evitar consulta aberta apenas pelo código da OS.
-- A aprovação da OS trava pessimisticamente as peças envolvidas antes de baixar estoque, reduzindo risco de corrida em aprovações concorrentes.
-- A entidade `Part` usa `@Version` para detecção otimista de conflitos de atualização.
-
-## Fase 3 — bootstrap multi-repositório
-
-CI independente e contratos preparados; **nenhuma infraestrutura AWS implantada**.
-
-- [Repositórios e governança](docs/fase3/repositories.md)
-- [Arquitetura e autenticação proposta](docs/fase3/deployment-architecture.md)
-- [CI atual e CD futuro](docs/fase3/cicd-strategy.md)
-- [Dependências, state e orçamento](docs/fase3/aws-infrastructure-dependencies.md)
-
-Lambda e Terraform novos contêm contratos e validações; implementação cloud será
-feita em PRs posteriores, sujeita a orçamento e autorização.
-
-[Revisão corretiva: matriz de requisitos, gates e governança](docs/fase3/corrective-review.md).
-Aprovação do bootstrap não representa conclusão da Fase 3; CI atual não executa CD.
-
-## Fase 3 — identidade read-only para Lambda
-
-A migration V10 expõe a view CPF sem alterar autenticação Java. Consulte o
-[contrato e provisionamento de permissões](docs/fase3/auth-identity-view.md).
-O runtime continua HMAC; a integração RS256 permanece bloqueada até migração testada.
-
-### Fase 3 — CUSTOMER JWT RS256
-
-A API aceita JWTs da Lambda em `GET /api/v1/customer/work-orders/{id}`, com autorização pelo proprietário persistido e resposta mínima. ADMIN mantém HMAC em cadeia separada.
-
-Configure `CUSTOMER_JWKS_URI`, `CUSTOMER_JWT_ISSUER`, `CUSTOMER_JWT_AUDIENCE` com valores reais do ambiente; HTTPS é obrigatório fora de local/test/it. Skew: `CUSTOMER_JWT_CLOCK_SKEW_SECONDS` (0–60); cache: `CUSTOMER_JWKS_CACHE_SECONDS` (1–300). Produção falha ao iniciar sem configuração confiável. Local sem configuração rejeita CUSTOMER.
-
-[Arquitetura, diagrama, configuração e testes Python → Spring](docs/fase3/customer-rs256-integration.md) · [ADR](docs/adr/0005-admin-customer-trust-domains.md).
+| Tema | Referência |
+| --- | --- |
+| Visão da arquitetura AWS | [Diagrama de staging](docs/images/oficina-arquitetura-aws.svg) |
+| Decisões arquiteturais | [Arquitetura hexagonal](docs/adr/0001-arquitetura-hexagonal.md) · [Identidades ADMIN e CUSTOMER](docs/adr/0005-admin-customer-trust-domains.md) |
+| Provisionamento e entrega AWS | [Fluxo entre stacks, ECR e K3s](docs/images/oficina-provisionamento-entrega.svg) |
+| Configuração da aplicação em staging | [Bootstrap e contratos](docs/staging/deployment.md) · [Manifests por digest](docs/staging/consolidation.md) |
+| Publicação e operação | [Release local para ECR](docs/staging/release-local.md) · [Promoção e rollback via SSM](docs/staging/promotion-manual.md) |
+| Identidade e autorização | [RS256 e JWKS](docs/fase3/customer-rs256-integration.md) · [Permissões da Lambda no banco](docs/security/sql-lambda-stage-6.md) |
+| Domínio | [Linguagem ubíqua](docs/linguagem-ubiqua.pdf) · [Event Storming](docs/Event%20Storming%20Oficina%20Mecanica.pdf) |
+| Ambiente local | [Terraform e Kind](infra/terraform/local/README.md) |
+| Apresentação | [Vídeo de apresentação](https://youtu.be/8tpXe1BIx18) |

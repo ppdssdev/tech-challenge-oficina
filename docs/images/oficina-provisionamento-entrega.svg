@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100" role="img" aria-labelledby="title desc">
+<title id="title">Oficina — provisionamento e entrega na AWS</title><desc id="desc">Duas trilhas: infraestrutura Terraform em rede K3s, RDS e identidade; entrega com CI GitHub Actions, publicação manual ECR, migration Job e promoção manual K3s via SSM. State independente em S3. Flyway separado do runtime e imagem por digest.</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto-start-reverse"><path d="M0,0 L9,4.5 L0,9 Z" fill="context-stroke"/></marker></defs>
+<rect x="0" y="0" width="1600" height="1100" rx="0" fill="#F4F7FB" stroke="none" stroke-width="1.5"/>
+<rect x="0" y="0" width="1600" height="148" rx="0" fill="#10243A" stroke="none" stroke-width="1.5"/>
+<rect x="40" y="30" width="7" height="82" rx="2" fill="#F5A544" stroke="none" stroke-width="1.5"/>
+<text x="65" y="44" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700" fill="#F5B65F">OFICINA / INFRAESTRUTURA E ENTREGA</text>
+<text x="65" y="90" font-family="DejaVu Sans, Arial, sans-serif" font-size="36" font-weight="700" fill="white">Do código ao ambiente AWS</text>
+<text x="65" y="122" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" fill="#C8D6E6">Contratos entre stacks · Schema antes do runtime · Imagem identificada por digest</text>
+<text x="40" y="199" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" fill="#2463A5">01 / PROVISIONAMENTO COM TERRAFORM</text>
+<text x="40" y="230" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" fill="#52657B">Os outputs de rede e banco conectam os repositórios sem compartilhar um único state.</text>
+<rect x="40" y="260" width="350" height="210" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="58" y="280" width="5" height="170" rx="2" fill="#2463A5" stroke="none" stroke-width="1.5"/>
+<text x="78" y="294" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#2463A5">STACK K3s</text>
+<text x="78" y="327" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">Rede e execução</text>
+<text x="78" y="359" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">VPC · subnets · SGs</text>
+<text x="78" y="386" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">EC2 com K3s · ECR</text>
+<text x="78" y="413" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">IAM / SSM · endpoint VPC</text>
+<rect x="430" y="260" width="350" height="210" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="448" y="280" width="5" height="170" rx="2" fill="#087F8C" stroke="none" stroke-width="1.5"/>
+<text x="468" y="294" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#087F8C">STACK RDS</text>
+<text x="468" y="327" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">Dados privados</text>
+<text x="468" y="359" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Contrato de rede como entrada</text>
+<text x="468" y="386" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">PostgreSQL · TLS · backups</text>
+<text x="468" y="413" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Endpoint e acesso restrito</text>
+<rect x="820" y="260" width="350" height="210" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="838" y="280" width="5" height="170" rx="2" fill="#087F8C" stroke="none" stroke-width="1.5"/>
+<text x="858" y="294" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#087F8C">BOOTSTRAP DO BANCO</text>
+<text x="858" y="327" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">Schema e roles</text>
+<text x="858" y="359" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Job Flyway com migrator</text>
+<text x="858" y="386" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Grants do runtime</text>
+<text x="858" y="413" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">View de identidade</text>
+<rect x="1210" y="260" width="350" height="210" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="1228" y="280" width="5" height="170" rx="2" fill="#7055AA" stroke="none" stroke-width="1.5"/>
+<text x="1248" y="294" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#7055AA">STACK AUTH</text>
+<text x="1248" y="327" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">Identidade</text>
+<text x="1248" y="359" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Lambda · pacote assinado</text>
+<text x="1248" y="386" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">API Gateway · Secrets Manager</text>
+<text x="1248" y="413" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Chaves públicas para a API</text>
+<path d="M390 362 H430" fill="none" stroke="#2463A5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M780 362 H820" fill="none" stroke="#2463A5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1170 362 H1210" fill="none" stroke="#2463A5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="40" y="498" width="1520" height="63" rx="12" fill="#EAE6F5" stroke="none" stroke-width="1.5"/>
+<text x="65" y="537" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#7055AA">STATE REMOTO EM S3</text>
+<text x="320" y="537" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" fill="#7055AA">staging/k3s  ·  staging/rds  ·  staging/lambda     |     versionamento + criptografia</text>
+<text x="40" y="617" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" fill="#C96B12">02 / VALIDAÇÃO, PUBLICAÇÃO E PROMOÇÃO</text>
+<text x="40" y="648" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" fill="#52657B">O CI valida. O operador publica e promove a release de staging usando credenciais temporárias.</text>
+<rect x="40" y="680" width="350" height="200" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="58" y="700" width="5" height="160" rx="2" fill="#2463A5" stroke="none" stroke-width="1.5"/>
+<text x="78" y="714" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#2463A5">GITHUB ACTIONS · CI</text>
+<text x="78" y="747" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">Validar o código</text>
+<text x="78" y="779" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">PR / push para main</text>
+<text x="78" y="806" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Testes · cobertura · build</text>
+<text x="78" y="833" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Schemas · Terraform · contratos</text>
+<rect x="430" y="680" width="350" height="200" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="448" y="700" width="5" height="160" rx="2" fill="#C96B12" stroke="none" stroke-width="1.5"/>
+<text x="468" y="714" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#C96B12">PUBLICAÇÃO MANUAL</text>
+<text x="468" y="747" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">Imagem no ECR</text>
+<text x="468" y="779" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Build do commit revisado</text>
+<text x="468" y="806" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Push com sessão temporária</text>
+<text x="468" y="833" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Digest sha256 registrado</text>
+<rect x="820" y="680" width="350" height="200" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="838" y="700" width="5" height="160" rx="2" fill="#C96B12" stroke="none" stroke-width="1.5"/>
+<text x="858" y="714" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#C96B12">RELEASE · VIA SSM</text>
+<text x="858" y="747" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">Preparar a aplicação</text>
+<text x="858" y="779" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">ConfigMaps e Secrets externos</text>
+<text x="858" y="806" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Job Flyway antes do rollout</text>
+<text x="858" y="833" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Mesmo digest: Job e API</text>
+<rect x="1210" y="680" width="350" height="200" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="1228" y="700" width="5" height="160" rx="2" fill="#087F8C" stroke="none" stroke-width="1.5"/>
+<text x="1248" y="714" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#087F8C">PROMOÇÃO MANUAL</text>
+<text x="1248" y="747" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">K3s em staging</text>
+<text x="1248" y="779" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Rollout pelo digest revisado</text>
+<text x="1248" y="806" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Probes · autenticação · HPA</text>
+<text x="1248" y="833" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Verificações de observabilidade</text>
+<path d="M390 778 H430" fill="none" stroke="#C96B12" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M780 778 H820" fill="none" stroke="#C96B12" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1170 778 H1210" fill="none" stroke="#C96B12" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="40" y="918" width="1520" height="108" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<text x="65" y="953" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#087F8C">RASTREABILIDADE DA RELEASE</text>
+<text x="65" y="990" font-family="DejaVu Sans, Arial, sans-serif" font-size="22" font-weight="600" fill="#10243A">Commit → imagem ECR → digest no Deployment → imageID dos pods → evidências de execução</text>
+<text x="40" y="1065" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#52657B">OFICINA TECH CHALLENGE</text>
+<text x="975" y="1065" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#52657B">CI automatizado · entrega AWS operada via SSM</text>
+</svg>

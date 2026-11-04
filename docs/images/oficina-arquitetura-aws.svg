@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1160" viewBox="0 0 1600 1160" role="img" aria-labelledby="title desc">
+<title id="title">Oficina — arquitetura AWS de staging</title><desc id="desc">Topologia de staging em us-east-2. Operador acessa EC2 com K3s via SSM. ECR fornece a imagem. API ClusterIP conecta ao RDS privado por TLS. Lambda usa leitura restrita de identidade. HPA escala de um a três pods em um nó. Observabilidade é definida no overlay. API Gateway público desabilitado; Lambda habilitada em janelas sintéticas.</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto-start-reverse"><path d="M0,0 L9,4.5 L0,9 Z" fill="context-stroke"/></marker></defs>
+<rect x="0" y="0" width="1600" height="1160" rx="0" fill="#F4F7FB" stroke="none" stroke-width="1.5"/>
+<rect x="0" y="0" width="1600" height="148" rx="0" fill="#10243A" stroke="none" stroke-width="1.5"/>
+<rect x="40" y="30" width="7" height="82" rx="2" fill="#F5A544" stroke="none" stroke-width="1.5"/>
+<text x="65" y="44" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700" fill="#F5B65F">OFICINA / ARQUITETURA DE HOMOLOGAÇÃO</text>
+<text x="65" y="90" font-family="DejaVu Sans, Arial, sans-serif" font-size="36" font-weight="700" fill="white">Aplicação, identidade e dados na AWS</text>
+<text x="65" y="122" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" fill="#C8D6E6">Região us-east-2 · Terraform em stacks independentes · Acesso operacional privado</text>
+<text x="40" y="192" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#52657B">OPERAÇÃO E ARTEFATOS</text>
+<rect x="360" y="177" width="1200" height="786" rx="22" fill="#EBF2FA" stroke="#B9CDE3" stroke-width="1.5"/>
+<text x="390" y="215" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#2463A5">AMAZON VPC</text>
+<text x="1080" y="215" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="400" fill="#52657B">REDE 10.30.0.0/16</text>
+<rect x="40" y="240" width="280" height="180" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="58" y="260" width="5" height="140" rx="2" fill="#2463A5" stroke="none" stroke-width="1.5"/>
+<text x="78" y="274" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#2463A5">ACESSO ADMINISTRATIVO</text>
+<text x="78" y="307" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">AWS SSM</text>
+<text x="78" y="339" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Operador com IAM</text>
+<text x="78" y="366" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Sessão e comandos</text>
+<text x="78" y="393" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Port-forward da API</text>
+<rect x="40" y="485" width="280" height="160" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="58" y="505" width="5" height="120" rx="2" fill="#C96B12" stroke="none" stroke-width="1.5"/>
+<text x="78" y="519" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#C96B12">REGISTRY</text>
+<text x="78" y="552" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">Amazon ECR</text>
+<text x="78" y="584" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Imagem por digest</text>
+<text x="78" y="611" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Tags imutáveis</text>
+<rect x="40" y="760" width="280" height="160" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="58" y="780" width="5" height="120" rx="2" fill="#7055AA" stroke="none" stroke-width="1.5"/>
+<text x="78" y="794" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#7055AA">INFRA COMO CÓDIGO</text>
+<text x="78" y="827" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">Terraform + S3</text>
+<text x="78" y="859" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">State por stack</text>
+<text x="78" y="886" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Versões e criptografia</text>
+<rect x="390" y="250" width="620" height="685" rx="16" fill="#FFFFFF" stroke="#B8CAE0" stroke-width="1.5"/>
+<text x="415" y="286" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#2463A5">SUBNET PÚBLICA · EC2 COM K3s</text>
+<rect x="420" y="320" width="560" height="145" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="438" y="340" width="5" height="105" rx="2" fill="#2463A5" stroke="none" stroke-width="1.5"/>
+<text x="458" y="354" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#2463A5">SERVICE CLUSTERIP :8080</text>
+<text x="458" y="387" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">Oficina API · Spring Boot</text>
+<text x="458" y="419" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Domínio + casos de uso + adapters</text>
+<text x="458" y="446" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">ADMIN HMAC · CUSTOMER RS256</text>
+<rect x="420" y="500" width="560" height="128" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="438" y="520" width="5" height="88" rx="2" fill="#087F8C" stroke="none" stroke-width="1.5"/>
+<text x="458" y="534" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#087F8C">ESCALABILIDADE DE PODS</text>
+<text x="458" y="567" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">HPA · 1 a 3 réplicas</text>
+<text x="458" y="599" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">CPU 70% · memória 75% · nó único</text>
+<text x="420" y="662" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Readiness + liveness · recursos limitados · não root</text>
+<rect x="1060" y="250" width="470" height="685" rx="16" fill="#EEF8F7" stroke="#B5D8D3" stroke-width="1.5"/>
+<text x="1085" y="286" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#087F8C">SUBNETS PRIVADAS · AZs a / b</text>
+<rect x="1090" y="320" width="410" height="172" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="1108" y="340" width="5" height="132" rx="2" fill="#087F8C" stroke="none" stroke-width="1.5"/>
+<text x="1128" y="354" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#087F8C">PERSISTÊNCIA</text>
+<text x="1128" y="387" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">Amazon RDS PostgreSQL</text>
+<text x="1128" y="419" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">oficina_db · Single-AZ</text>
+<text x="1128" y="446" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">20 GiB gp3 criptografados</text>
+<text x="1128" y="473" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">5432: SG da API e da Lambda</text>
+<path d="M980 389 H1090" fill="none" stroke="#087F8C" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="967" y="350" width="118" height="26" rx="4" fill="#EBF2FA" stroke="none" stroke-width="1.5"/>
+<text x="975" y="369" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700" fill="#087F8C">JDBC / TLS</text>
+<rect x="1090" y="575" width="410" height="148" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="1108" y="595" width="5" height="108" rx="2" fill="#7055AA" stroke="none" stroke-width="1.5"/>
+<text x="1128" y="609" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#7055AA">IDENTIDADE</text>
+<text x="1128" y="642" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">AWS Lambda · Python</text>
+<text x="1128" y="674" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">JWT CUSTOMER RS256</text>
+<text x="1128" y="701" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">View de identidade · leitura</text>
+<path d="M1295 575 V492" fill="none" stroke="#7055AA" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<text x="1310" y="535" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#7055AA">SQL / TLS</text>
+<rect x="1090" y="795" width="410" height="110" rx="16" fill="white" stroke="#D7E1EC" stroke-width="1.5"/>
+<rect x="1108" y="815" width="5" height="70" rx="2" fill="#7055AA" stroke="none" stroke-width="1.5"/>
+<text x="1128" y="829" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#7055AA">SEGREDOS</text>
+<text x="1128" y="862" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#10243A">Endpoint VPC</text>
+<text x="1128" y="894" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Acesso ao Secrets Manager</text>
+<path d="M1295 723 V795" fill="none" stroke="#7055AA" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M320 355 H350 V400 H420" fill="none" stroke="#2463A5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M320 555 H390" fill="none" stroke="#C96B12" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<text x="326" y="539" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700" fill="#C96B12">pull</text>
+<rect x="420" y="710" width="560" height="200" rx="16" fill="#F7FAFC" stroke="#D7E1EC" stroke-width="1.5"/>
+<text x="440" y="748" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#087F8C">OBSERVABILIDADE · MESMO NÓ K3s</text>
+<rect x="440" y="780" width="165" height="80" rx="10" fill="#F0F7F8" stroke="none" stroke-width="1.5"/>
+<text x="456" y="813" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#10243A">Prometheus</text>
+<text x="456" y="841" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#52657B">scrape 15 s</text>
+<rect x="620" y="780" width="145" height="80" rx="10" fill="#F0F7F8" stroke="none" stroke-width="1.5"/>
+<text x="636" y="813" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#10243A">Grafana</text>
+<text x="636" y="841" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#52657B">dashboards</text>
+<rect x="780" y="780" width="180" height="80" rx="10" fill="#F0F7F8" stroke="none" stroke-width="1.5"/>
+<text x="796" y="813" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#10243A">Tempo</text>
+<text x="796" y="841" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#52657B">OTLP opt-in</text>
+<text x="440" y="892" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#52657B">Overlay staging · métricas, logs e traces</text>
+<rect x="40" y="990" width="1520" height="118" rx="16" fill="#FFFFFF" stroke="#D7E1EC" stroke-width="1.5"/>
+<text x="65" y="1025" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700" fill="#C96B12">FRONTEIRAS DE ACESSO</text>
+<text x="65" y="1058" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" fill="#52657B">API: acesso via SSM / port-forward. API Gateway: rota /auth/token com endpoint público desabilitado.</text>
+<text x="65" y="1087" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" fill="#52657B">Lambda: janela sintética controlada. Chaves públicas na API; segredos e permissões separados por consumidor.</text>
+<text x="40" y="1138" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#52657B">OFICINA TECH CHALLENGE</text>
+<text x="1020" y="1138" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#52657B">Topologia documentada · novembro de 2026</text>
+</svg>
