@@ -1,3 +1,5 @@
+[![Oficina na AWS: EC2, K3s, Docker, RDS, Lambda, Secrets Manager e observabilidade](docs/images/oficina-arquitetura-aws.svg)](docs/images/oficina-arquitetura-aws.svg)
+
 # Oficina · Tech Challenge
 
 **Gestão de oficinas mecânicas, da abertura da ordem de serviço à entrega do veículo.**
@@ -22,9 +24,7 @@ O ambiente de homologação combina **Kubernetes com K3s em EC2**, **Amazon RDS 
 
 ## Arquitetura na AWS
 
-![Arquitetura AWS da Oficina: EC2 com K3s, RDS privado, autenticação Lambda e serviços de operação](docs/images/oficina-arquitetura-aws.svg)
-
-*A visão representa a topologia de staging e os componentes definidos nos repositórios. As conexões e os controles de acesso estão identificados no desenho; o SVG pode ser aberto para visualizar os detalhes.*
+A capa apresenta a topologia de staging: EC2, cluster K3s, réplicas da API, RDS privado, autenticação Lambda e serviços de suporte. [Abra o diagrama em tamanho completo](docs/images/oficina-arquitetura-aws.svg) para explorar as conexões e os limites da rede.
 
 A infraestrutura está organizada em uma VPC na região **`us-east-2` (Ohio)**. O nó EC2 executa K3s em uma subnet pública, enquanto o RDS e as interfaces de rede da Lambda utilizam subnets privadas. A API é exposta dentro do cluster por um Service **ClusterIP**, com acesso operacional por SSM e encaminhamento de portas.
 
@@ -306,3 +306,4 @@ bash -n scripts/staging/render.sh
 | Domínio | [Linguagem ubíqua](docs/linguagem-ubiqua.pdf) · [Event Storming](docs/Event%20Storming%20Oficina%20Mecanica.pdf) |
 | Ambiente local | [Terraform e Kind](infra/terraform/local/README.md) |
 | Apresentação | [Vídeo de apresentação](https://youtu.be/8tpXe1BIx18) |
+| Ícones da arquitetura | [Fontes e licença](docs/images/CREDITOS-ICONES.md) |
